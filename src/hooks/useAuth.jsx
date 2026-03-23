@@ -62,10 +62,13 @@ export function AuthProvider({ children }) {
   }
 
   const isAdmin = profile?.role === 'admin';
+  const isStaff = profile?.role === 'staff';
   const isSales = profile?.role === 'sales';
+  // admin + staff 는 영문 코드를 볼 수 있음; sales 는 국문명만 표시
+  const canViewCodes = isAdmin || isStaff;
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, isAdmin, isSales }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, isAdmin, isStaff, isSales, canViewCodes }}>
       {children}
     </AuthContext.Provider>
   );

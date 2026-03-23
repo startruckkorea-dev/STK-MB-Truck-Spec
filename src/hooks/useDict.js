@@ -12,15 +12,32 @@ export function useDict() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterHidden, setFilterHidden] = useState('all'); // 'all' | 'shown' | 'hidden'
+  const [mode, setMode] = useState('all'); // 'all' | 'updated'
 
   useEffect(() => {
     fetchItems();
-  }, [page, search, filterCategory, filterHidden]);
+  }, [page, search, filterCategory, filterHidden, mode]);
 
   async function fetchItems() {
     setLoading(true);
 
     let query = supabase.from('code_dict').select('*', { count: 'exact' });
+
+    // 모델 사용 코드 탭: specs 테이블에서 실제 사용된 코드만 필터
+    if (mode === 'updated') {
+      const { data: specData } = await supabase
+        .from('specs')
+        .select('spec_value')
+        .not('spec_value', 'is', null);
+      const modelCodes = [...new Set((specData || []).map((r) => r.spec_value))];
+      if (modelCodes.length === 0) {
+        setItems([]);
+        setTotal(0);
+        setLoading(false);
+        return;
+      }
+      query = query.in('code', modelCodes);
+    }
 
     if (search) {
       query = query.or(`code.ilike.%${search}%,name_ko.ilike.%${search}%,name_en.ilike.%${search}%`);
@@ -36,7 +53,10 @@ export function useDict() {
 
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
-    query = query.range(from, to).order('category').order('code');
+    query = query
+      .range(from, to)
+      .order('category', { ascending: true, nullsFirst: false })
+      .order('code', { ascending: true });
 
     const { data, error, count } = await query;
 
@@ -94,6 +114,7 @@ export function useDict() {
     search, setSearch,
     filterCategory, setFilterCategory,
     filterHidden, setFilterHidden,
+    mode, setMode,
     categories,
     upsertItem, deleteItem, toggleHidden,
     refetch: fetchItems,

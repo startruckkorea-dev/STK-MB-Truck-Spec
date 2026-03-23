@@ -6,6 +6,30 @@ import { useModels } from '../hooks/useModels';
 
 const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego'];
 
+// 차종 정렬 우선순위
+const BODY_TYPE_ORDER = ['트랙터', '카고', '덤프', '믹서', '크레인'];
+
+function getYearHeaderStyle(modelYear) {
+  const n = parseInt(String(modelYear).replace(/\D/g, '')) || 0;
+  if (n >= 28) return 'text-amber-700 bg-amber-50 border border-amber-300';
+  if (n === 27) return 'text-violet-700 bg-violet-50 border border-violet-300';
+  if (n === 26) return 'text-sky-700 bg-sky-50 border border-sky-300';
+  if (n === 25) return 'text-teal-700 bg-teal-50 border border-teal-300';
+  if (n === 24) return 'text-orange-700 bg-orange-50 border border-orange-300';
+  return 'text-gray-600 bg-gray-100 border border-gray-300';
+}
+
+function sortBodyTypes(types) {
+  return types.sort(([a], [b]) => {
+    const ia = BODY_TYPE_ORDER.indexOf(a);
+    const ib = BODY_TYPE_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
 export default function Models() {
   const { models, loading, error, refetch } = useModels();
 
@@ -29,13 +53,31 @@ export default function Models() {
         const q = search.toLowerCase();
         if (
           !m.code.toLowerCase().includes(q) &&
-          !m.name_ko.toLowerCase().includes(q) &&
+          !(m.name_ko || '').toLowerCase().includes(q) &&
           !m.model_year.toLowerCase().includes(q)
         ) return false;
       }
       return true;
     });
   }, [models, activeSeries, selectedYear, search]);
+
+  // MY별 → 차종별 그룹핑
+  const grouped = useMemo(() => {
+    const yearMap = {};
+    filtered.forEach((m) => {
+      const yr = m.model_year || '기타';
+      const body = m.name_ko || '기타';
+      if (!yearMap[yr]) yearMap[yr] = {};
+      if (!yearMap[yr][body]) yearMap[yr][body] = [];
+      yearMap[yr][body].push(m);
+    });
+    return Object.entries(yearMap)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([year, typeMap]) => ({
+        year,
+        types: sortBodyTypes(Object.entries(typeMap)),
+      }));
+  }, [filtered]);
 
   function toggleCompare(model) {
     setCompareList((prev) => {
@@ -117,7 +159,7 @@ export default function Models() {
         </div>
       )}
 
-      {/* 모델 그리드 */}
+      {/* 모델 그리드 — MY별, 차종별 그룹 */}
       {!loading && !error && (
         <>
           {filtered.length === 0 ? (
@@ -125,17 +167,43 @@ export default function Models() {
               조건에 맞는 모델이 없습니다.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-              {filtered.map((model) => (
-                <ModelCard
-                  key={model.id}
-                  model={model}
-                  isSelected={compareList.some((m) => m.id === model.id)}
-                  onCompareToggle={toggleCompare}
-                  onVisibilityChange={refetch}
-                />
-              ))}
-            </div>
+            grouped.map(({ year, types }) => (
+              <div key={year} className="mb-8 sm:mb-10">
+                {/* MY 섹션 헤더 */}
+                <div className="flex items-center gap-3 mb-4">
+                  <span className={`font-barlow font-bold text-base tracking-widest px-3 py-1 rounded ${getYearHeaderStyle(year)}`}>
+                    {year}
+                  </span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+
+                {/* 차종별 서브그룹 */}
+                {types.map(([bodyType, bodyModels]) => (
+                  <div key={bodyType} className="mb-5">
+                    {/* 차종 서브헤더 (차종이 2가지 이상일 때만) */}
+                    {types.length > 1 && (
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest pl-1">
+                          {bodyType}
+                        </span>
+                        <div className="flex-1 h-px bg-gray-100" />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                      {bodyModels.map((model) => (
+                        <ModelCard
+                          key={model.id}
+                          model={model}
+                          isSelected={compareList.some((m) => m.id === model.id)}
+                          onCompareToggle={toggleCompare}
+                          onVisibilityChange={refetch}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
           )}
         </>
       )}

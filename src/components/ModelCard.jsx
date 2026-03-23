@@ -4,6 +4,16 @@ import Button from './ui/Button';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
+function getYearVariant(modelYear) {
+  const n = parseInt(String(modelYear).replace(/\D/g, '')) || 0;
+  if (n >= 28) return 'year28';
+  if (n === 27) return 'year27';
+  if (n === 26) return 'year26';
+  if (n === 25) return 'year25';
+  if (n === 24) return 'year24';
+  return 'yearOld';
+}
+
 
 export default function ModelCard({
   model,
@@ -44,7 +54,7 @@ export default function ModelCard({
           {model.name_ko && (
             <Badge variant="default">{model.name_ko}</Badge>
           )}
-          <Badge variant="year">{model.model_year}</Badge>
+          <Badge variant={getYearVariant(model.model_year)}>{model.model_year}</Badge>
           {model.badge && (
             <Badge variant={model.badge === 'new' ? 'new' : 'updated'}>
               {model.badge === 'new' ? 'NEW' : 'update'}

@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth';
  * onToggleHide: (specId, currentIsHidden) => void  — admin 전용 인라인 숨김 토글
  */
 export default function SpecTable({ specs, dict, onToggleHide }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, canViewCodes } = useAuth();
 
   // 카테고리별 그룹핑
   const groups = groupByCategory(specs);
@@ -24,6 +24,7 @@ export default function SpecTable({ specs, dict, onToggleHide }) {
           items={items}
           dict={dict}
           isAdmin={isAdmin}
+          canViewCodes={canViewCodes}
           onToggleHide={onToggleHide}
         />
       ))}
@@ -31,7 +32,7 @@ export default function SpecTable({ specs, dict, onToggleHide }) {
   );
 }
 
-function CategoryGroup({ category, items, dict, isAdmin, onToggleHide }) {
+function CategoryGroup({ category, items, dict, isAdmin, canViewCodes, onToggleHide }) {
   const [open, setOpen] = useState(true);
 
   // 숨겨진 항목 개수 (sales는 아예 렌더 안 함)
@@ -69,7 +70,10 @@ function CategoryGroup({ category, items, dict, isAdmin, onToggleHide }) {
             // 표시할 값 결정
             let displayValue;
             if (!spec.use_translate) {
-              displayValue = <span className="font-mono text-xs">{spec.spec_value}</span>;
+              // 번역 사전 미사용 항목: admin/staff는 코드 그대로, sales는 국문명 없으므로 그대로 표시
+              displayValue = canViewCodes
+                ? <span className="font-mono text-xs">{spec.spec_value}</span>
+                : <span className="text-xs sm:text-sm text-gray-500">{spec.spec_value}</span>;
             } else if (dictEntry) {
               displayValue = dictEntry.is_color && dictEntry.hex_color
                 ? <ColorSwatch hexColor={dictEntry.hex_color} nameKo={dictEntry.name_ko} />
@@ -78,7 +82,7 @@ function CategoryGroup({ category, items, dict, isAdmin, onToggleHide }) {
               displayValue = (
                 <span className="text-amber-500 text-xs">
                   번역 미등록
-                  {isAdmin && (
+                  {canViewCodes && (
                     <span className="ml-1 font-mono text-gray-400">({spec.spec_value})</span>
                   )}
                 </span>

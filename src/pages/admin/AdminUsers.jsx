@@ -24,8 +24,10 @@ export default function AdminUsers() {
     setLoading(false);
   }
 
-  async function toggleRole(user) {
-    const newRole = user.role === 'admin' ? 'sales' : 'admin';
+  async function cycleRole(user) {
+    const roles = ['admin', 'staff', 'sales'];
+    const currentIdx = roles.indexOf(user.role);
+    const newRole = roles[(currentIdx + 1) % roles.length];
     const { error } = await supabase
       .from('profiles')
       .update({ role: newRole })
@@ -48,6 +50,7 @@ export default function AdminUsers() {
   }
 
   const adminCount = users.filter((u) => u.role === 'admin').length;
+  const staffCount = users.filter((u) => u.role === 'staff').length;
   const salesCount = users.filter((u) => u.role === 'sales').length;
 
   return (
@@ -55,7 +58,7 @@ export default function AdminUsers() {
       <div className="mb-4 sm:mb-6">
         <h1 className="font-barlow font-bold text-lg sm:text-2xl text-gray-900 tracking-wide">사용자 관리</h1>
         <p className="text-gray-500 text-xs sm:text-sm mt-1">
-          총 {users.length}명 (관리자 {adminCount}명 / 영업 {salesCount}명)
+          총 {users.length}명 (관리자 {adminCount}명 / 본사직원 {staffCount}명 / 영업 {salesCount}명)
         </p>
       </div>
 
@@ -96,14 +99,17 @@ export default function AdminUsers() {
                 </td>
                 <td className="px-4 py-3 text-center">
                   <button
-                    onClick={() => toggleRole(user)}
+                    onClick={() => cycleRole(user)}
+                    title="클릭하여 역할 변경 (Admin → Staff → Sales)"
                     className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
                       user.role === 'admin'
-                        ? 'bg-mb-blue text-white hover:bg-mb-blue-dark'
+                        ? 'bg-mb-blue text-white hover:bg-blue-600'
+                        : user.role === 'staff'
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    {user.role === 'admin' ? 'Admin' : 'Sales'}
+                    {user.role === 'admin' ? 'Admin' : user.role === 'staff' ? 'Staff' : 'Sales'}
                   </button>
                 </td>
                 <td className="px-4 py-3 text-center">
@@ -136,14 +142,17 @@ export default function AdminUsers() {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
-                  onClick={() => toggleRole(user)}
+                  onClick={() => cycleRole(user)}
+                  title="클릭하여 역할 변경"
                   className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     user.role === 'admin'
                       ? 'bg-mb-blue text-white'
+                      : user.role === 'staff'
+                      ? 'bg-green-100 text-green-700'
                       : 'bg-gray-100 text-gray-600'
                   }`}
                 >
-                  {user.role === 'admin' ? 'Admin' : 'Sales'}
+                  {user.role === 'admin' ? 'Admin' : user.role === 'staff' ? 'Staff' : 'Sales'}
                 </button>
                 <Toggle
                   checked={user.is_active ?? true}
@@ -157,7 +166,8 @@ export default function AdminUsers() {
 
       <div className="mt-4 p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg text-xs sm:text-sm text-amber-700">
         <strong>참고:</strong> 신규 사용자는 Supabase Authentication에서 이메일로 초대 후 자동으로 이 목록에 추가됩니다.
-        역할 기본값은 <code className="bg-amber-100 px-1 rounded">sales</code>이며 필요 시 Admin으로 변경하세요.
+        역할 기본값은 <code className="bg-amber-100 px-1 rounded">sales</code>이며, 역할 배지를 클릭하면 Admin → Staff → Sales 순으로 변경됩니다.
+        <br />• <strong>Admin</strong>: 전체 관리 기능 &nbsp;• <strong>Staff (본사직원)</strong>: 코드 열람 가능 &nbsp;• <strong>Sales (영업직원)</strong>: 국문명만 표시
       </div>
     </Layout>
   );

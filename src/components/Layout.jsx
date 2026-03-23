@@ -2,6 +2,13 @@ import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
+const ROLE_LABEL = { admin: '관리자', staff: '본사직원', sales: '영업직원' };
+const ROLE_BADGE_CLS = {
+  admin: 'bg-mb-blue text-white',
+  staff: 'bg-green-100 text-green-700',
+  sales: 'bg-gray-100 text-gray-600',
+};
+
 export default function Layout({ children }) {
   const { profile, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
