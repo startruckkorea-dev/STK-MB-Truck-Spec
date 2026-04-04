@@ -12,8 +12,13 @@ jobs:
     steps:
       - name: Ping Supabase
         run: |
-          curl -sf -o /dev/null \
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/models?select=id&limit=1"
+            "${{ secrets.SUPABASE_URL }}/rest/v1/health_check?select=id&limit=1")
+          echo "HTTP Status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "Ping failed with status $HTTP_STATUS"
+            exit 1
+          fi
           echo "Ping successful"
