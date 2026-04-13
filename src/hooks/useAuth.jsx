@@ -57,6 +57,19 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   }
 
+  async function signUp(email, password, name) {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+
+    // profiles 테이블에 기본 role 'sales'로 등록
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({ id: data.user.id, name, role: 'sales' });
+      if (profileError) throw profileError;
+    }
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
   }
@@ -68,7 +81,7 @@ export function AuthProvider({ children }) {
   const canViewCodes = isAdmin || isStaff;
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, isAdmin, isStaff, isSales, canViewCodes }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut, isAdmin, isStaff, isSales, canViewCodes }}>
       {children}
     </AuthContext.Provider>
   );
