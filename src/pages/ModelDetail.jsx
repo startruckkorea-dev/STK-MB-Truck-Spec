@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import { useModelDetail } from '../hooks/useModels';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { exportDetailToExcel, exportDetailToPDF } from '../lib/export';
 
 
 export default function ModelDetail() {
@@ -111,13 +112,27 @@ export default function ModelDetail() {
               )}
             </div>
             <h1 className="font-noto font-bold text-lg sm:text-2xl text-gray-900 mb-0.5 sm:mb-1">
-              {model.series} {model.code}
+              {model.series} {model.code}{model.axle ? ` ${model.axle}` : ''}{model.cabin ? ` ${model.cabin}` : ''}
             </h1>
             {model.code_desc && (
               <p className="text-xs sm:text-sm text-gray-400 mt-1">{model.code_desc}</p>
             )}
           </div>
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex gap-2 flex-shrink-0 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportDetailToExcel(model, specs, dict, notes)}
+            >
+              Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportDetailToPDF(model, specs, dict, notes)}
+            >
+              PDF
+            </Button>
             <Link to="/models">
               <Button variant="outline" size="sm">← 목록</Button>
             </Link>

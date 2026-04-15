@@ -20,6 +20,8 @@ export default function AdminModelEdit() {
   // ── 기본 정보 ──
   const [series, setSeries] = useState('Actros');
   const [code, setCode] = useState('');
+  const [axle, setAxle] = useState('');
+  const [cabin, setCabin] = useState('');
   const [codeDesc, setCodeDesc] = useState('');
   const [nameKo, setNameKo] = useState('');
   const [modelYear, setModelYear] = useState('');
@@ -47,6 +49,8 @@ export default function AdminModelEdit() {
       if (error || !data) return;
       setSeries(data.series);
       setCode(data.code);
+      setAxle(data.axle ?? '');
+      setCabin(data.cabin ?? '');
       setCodeDesc(data.code_desc ?? '');
       setNameKo(data.name_ko);
       setModelYear(data.model_year);
@@ -153,6 +157,10 @@ export default function AdminModelEdit() {
       setErrorMsg('시리즈, 모델 코드, 차종분류, Model Year는 필수입니다.');
       return;
     }
+    if (!axle || !cabin) {
+      setErrorMsg('축 구성과 캐빈 타입은 필수입니다.');
+      return;
+    }
     setSaving(true);
     setErrorMsg('');
 
@@ -162,9 +170,15 @@ export default function AdminModelEdit() {
 
       // models 테이블 upsert
       const modelPayload = {
-        series, code, code_desc: codeDesc || null,
-        name_ko: nameKo, model_year: modelYear,
-        badge: badge || null, is_visible: isVisible,
+        series,
+        code: code.trim().toUpperCase(),
+        axle: axle.trim(),
+        cabin: cabin.trim().toUpperCase(),
+        code_desc: codeDesc || null,
+        name_ko: nameKo,
+        model_year: modelYear,
+        badge: badge || null,
+        is_visible: isVisible,
       };
 
       if (isEdit) {
@@ -232,8 +246,8 @@ export default function AdminModelEdit() {
       navigate('/admin/models');
     } catch (err) {
       console.error('[Save-Error]', err);
-      if (err.message?.includes('models_code_model_year_key')) {
-        setErrorMsg('같은 모델 코드 + Model Year 조합이 이미 등록되어 있습니다. 기존 모델 목록에서 해당 모델을 편집하거나, 모델 코드 또는 Model Year를 변경해주세요.');
+      if (err.message?.includes('models_code_axle_cabin_year_key') || err.message?.includes('models_code_model_year_key')) {
+        setErrorMsg('같은 모델 코드 + 축 + 캐빈 + Model Year 조합이 이미 등록되어 있습니다. 기존 모델 목록에서 해당 모델을 편집하거나 값을 변경해주세요.');
       } else {
         setErrorMsg(err.message);
       }
@@ -283,10 +297,41 @@ export default function AdminModelEdit() {
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="예: L2653LS/33"
+                placeholder="예: 2863LS, 1833L"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-mb-blue"
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">축 구성 *</label>
+                <input
+                  value={axle}
+                  onChange={(e) => setAxle(e.target.value)}
+                  placeholder="예: 6x2, 8x4"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-mb-blue"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">캐빈 *</label>
+                <input
+                  value={cabin}
+                  onChange={(e) => setCabin(e.target.value)}
+                  placeholder="예: S5F, G5F"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-mb-blue"
+                />
+              </div>
+            </div>
+
+            {/* 미리보기 */}
+            {(code || axle || cabin) && (
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs text-gray-400 mb-0.5">표시 이름 미리보기</p>
+                <p className="text-sm font-bold text-gray-800 font-mono">
+                  {series} {code}{axle ? ` ${axle}` : ''}{cabin ? ` ${cabin}` : ''}
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">기타 특징 (선택)</label>

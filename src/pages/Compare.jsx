@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import CompareTable from '../components/CompareTable';
 import Button from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
+import { exportCompareToExcel, exportCompareToPDF } from '../lib/export';
 
 export default function Compare() {
   const [searchParams] = useSearchParams();
@@ -133,9 +134,27 @@ export default function Compare() {
             </button>
           </div>
         </div>
-        <Link to="/models">
-          <Button variant="outline" size="sm">← 목록</Button>
-        </Link>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly)}
+            disabled={loading || models.length === 0}
+          >
+            Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly)}
+            disabled={loading || models.length === 0}
+          >
+            PDF
+          </Button>
+          <Link to="/models">
+            <Button variant="outline" size="sm">← 목록</Button>
+          </Link>
+        </div>
       </div>
 
       {loading && (

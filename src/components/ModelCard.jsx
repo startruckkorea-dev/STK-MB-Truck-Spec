@@ -63,9 +63,16 @@ export default function ModelCard({
         </div>
 
         {/* 모델명: 시리즈 + 코드 */}
-        <h3 className="font-noto font-bold text-gray-900 text-sm sm:text-base leading-snug mb-3 sm:mb-4">
-          {model.series} {model.code}
+        <h3 className="font-noto font-bold text-gray-900 text-sm sm:text-base leading-snug mb-1">
+          {model.series} {model.code}{model.axle ? ` ${model.axle}` : ''}{model.cabin ? ` ${model.cabin}` : ''}
         </h3>
+
+        {/* 기타 특징 — 항상 동일한 높이 유지 */}
+        <div className="min-h-[1rem] mb-3 sm:mb-4">
+          {model.code_desc && (
+            <p className="text-xs text-gray-400 leading-snug">{model.code_desc}</p>
+          )}
+        </div>
 
         {/* 액션 버튼 */}
         <div className="flex gap-2">
