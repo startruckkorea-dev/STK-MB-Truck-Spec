@@ -13,6 +13,8 @@ export function useDict() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterHidden, setFilterHidden] = useState('all'); // 'all' | 'shown' | 'hidden'
   const [mode, setMode] = useState('all'); // 'all' | 'updated'
+  // 모델에서 사용 중이지만 code_dict에 미등록된 코드
+  const [unregisteredCodes, setUnregisteredCodes] = useState([]);
 
   useEffect(() => {
     fetchItems();
@@ -20,23 +22,47 @@ export function useDict() {
 
   async function fetchItems() {
     setLoading(true);
+    setUnregisteredCodes([]);
 
     let query = supabase.from('code_dict').select('*', { count: 'exact' });
 
-    // 모델 사용 코드 탭: specs 테이블에서 실제 사용된 코드만 필터
+    // 모델 사용 코드 탭: specs 테이블에서 실제 사용된 코드 기준
     if (mode === 'updated') {
       const { data: specData } = await supabase
         .from('specs')
         .select('spec_value')
+        .eq('use_translate', true)
         .not('spec_value', 'is', null);
-      const modelCodes = [...new Set((specData || []).map((r) => r.spec_value))];
-      if (modelCodes.length === 0) {
+
+      const allSpecCodes = [...new Set((specData || []).map((r) => r.spec_value))];
+
+      if (allSpecCodes.length === 0) {
         setItems([]);
         setTotal(0);
         setLoading(false);
         return;
       }
-      query = query.in('code', modelCodes);
+
+      // code_dict에 등록된 코드 확인
+      const { data: dictCodes } = await supabase
+        .from('code_dict')
+        .select('code')
+        .in('code', allSpecCodes);
+
+      const registeredSet = new Set((dictCodes || []).map((d) => d.code));
+
+      // 미등록 코드 (검색어 적용)
+      let unregistered = allSpecCodes
+        .filter((c) => !registeredSet.has(c))
+        .sort();
+      if (search) {
+        unregistered = unregistered.filter((c) =>
+          c.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+      setUnregisteredCodes(unregistered);
+
+      query = query.in('code', allSpecCodes);
     }
 
     if (search) {
@@ -116,6 +142,7 @@ export function useDict() {
     filterHidden, setFilterHidden,
     mode, setMode,
     categories,
+    unregisteredCodes,
     upsertItem, deleteItem, toggleHidden,
     refetch: fetchItems,
   };

@@ -35,7 +35,8 @@ export default function AdminDict() {
     filterCategory, setFilterCategory,
     filterHidden, setFilterHidden,
     mode, setMode,
-    categories, upsertItem, deleteItem, toggleHidden, refetch,
+    categories, unregisteredCodes,
+    upsertItem, deleteItem, toggleHidden, refetch,
   } = useDict();
 
   const [modal, setModal] = useState(null); // null | 'new' | item
@@ -43,8 +44,8 @@ export default function AdminDict() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
-  function openNew() {
-    setForm(EMPTY_FORM);
+  function openNew(prefillCode = '') {
+    setForm({ ...EMPTY_FORM, code: prefillCode });
     setFormError('');
     setModal('new');
   }
@@ -184,11 +185,32 @@ export default function AdminDict() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
+            {/* 미등록 코드 행 (모델 사용 코드 탭에서만) */}
+            {!loading && mode === 'updated' && unregisteredCodes.map((code) => (
+              <tr key={`unreg-${code}`} className="bg-amber-50">
+                <td className="px-4 py-2.5 font-mono text-xs text-amber-800 font-semibold whitespace-nowrap">{code}</td>
+                <td className="px-4 py-2.5 text-amber-500 text-xs hidden lg:table-cell">—</td>
+                <td className="px-4 py-2.5">
+                  <span className="text-xs text-amber-600 font-medium">번역 미등록</span>
+                </td>
+                <td className="px-4 py-2.5 text-amber-400 text-xs hidden md:table-cell">—</td>
+                <td className="px-4 py-2.5 text-center">—</td>
+                <td className="px-4 py-2.5 text-center">—</td>
+                <td className="px-4 py-2.5 text-right">
+                  <button
+                    onClick={() => openNew(code)}
+                    className="px-2 py-1 text-xs text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors"
+                  >
+                    등록
+                  </button>
+                </td>
+              </tr>
+            ))}
             {loading ? (
               <tr>
                 <td colSpan={7} className="text-center py-10 text-gray-400 animate-pulse">로딩 중...</td>
               </tr>
-            ) : items.length === 0 ? (
+            ) : items.length === 0 && unregisteredCodes.length === 0 ? (
               <tr>
                 <td colSpan={7} className="text-center py-10 text-gray-400">검색 결과가 없습니다.</td>
               </tr>
@@ -307,9 +329,24 @@ export default function AdminDict() {
 
       {/* 모바일 카드 리스트 */}
       <div className="sm:hidden space-y-2">
+        {/* 미등록 코드 카드 */}
+        {!loading && mode === 'updated' && unregisteredCodes.map((code) => (
+          <div key={`unreg-${code}`} className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between gap-2">
+            <div>
+              <span className="font-mono text-xs font-semibold text-amber-800">{code}</span>
+              <p className="text-xs text-amber-600 mt-0.5">번역 미등록</p>
+            </div>
+            <button
+              onClick={() => openNew(code)}
+              className="px-2 py-1 text-xs text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors flex-shrink-0"
+            >
+              등록
+            </button>
+          </div>
+        ))}
         {loading ? (
           <div className="text-center py-10 text-gray-400 animate-pulse">로딩 중...</div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && unregisteredCodes.length === 0 ? (
           <div className="text-center py-10 text-gray-400 text-sm">검색 결과가 없습니다.</div>
         ) : items.map((item) => {
           const d = getDisplayFields(item);
