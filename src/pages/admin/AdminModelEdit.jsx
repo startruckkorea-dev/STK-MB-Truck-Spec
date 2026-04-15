@@ -37,6 +37,8 @@ export default function AdminModelEdit() {
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [warnMsg, setWarnMsg] = useState('');      // 중복 경고 (1회)
+  const [duplicateWarned, setDuplicateWarned] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // ── 보충 노트 ──
@@ -163,10 +165,44 @@ export default function AdminModelEdit() {
     }
     setSaving(true);
     setErrorMsg('');
+    setWarnMsg('');
 
     try {
       console.log('[Save-1] 저장 시작');
       let modelId = id ? Number(id) : null;
+
+      // ── 신규 등록 시 중복 사전 체크 ──
+      if (!isEdit) {
+        const { data: existing } = await supabase
+          .from('models')
+          .select('id')
+          .eq('code', code.trim().toUpperCase())
+          .eq('model_year', modelYear)
+          .eq('axle', axle.trim())
+          .eq('cabin', cabin.trim().toUpperCase())
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          if (!codeDesc?.trim()) {
+            // 기타특징 없음 → 등록 불가
+            setErrorMsg(
+              '같은 모델 코드 + 축 + 캐빈 + Model Year 조합이 이미 등록되어 있습니다.\n기존 모델을 편집하거나, 기타특징(예: 챔피언스 에디션)을 입력하면 별도 모델로 등록할 수 있습니다.'
+            );
+            setSaving(false);
+            return;
+          }
+          if (!duplicateWarned) {
+            // 기타특징 있음 → 경고 1회 표시 후 재클릭 시 진행
+            setDuplicateWarned(true);
+            setWarnMsg(
+              '⚠️ 동일한 코드 조합이 이미 존재합니다. 기타특징이 입력되어 있으므로 별도 모델로 등록할 수 있습니다.\n계속 등록하려면 [모델 등록] 버튼을 다시 클릭하세요.'
+            );
+            setSaving(false);
+            return;
+          }
+          // duplicateWarned = true → 경고 확인됨, 계속 진행
+        }
+      }
 
       // models 테이블 upsert
       const modelPayload = {
@@ -246,8 +282,14 @@ export default function AdminModelEdit() {
       navigate('/admin/models');
     } catch (err) {
       console.error('[Save-Error]', err);
-      if (err.message?.includes('models_code_axle_cabin_year_key') || err.message?.includes('models_code_model_year_key')) {
-        setErrorMsg('같은 모델 코드 + 축 + 캐빈 + Model Year 조합이 이미 등록되어 있습니다. 기존 모델 목록에서 해당 모델을 편집하거나 값을 변경해주세요.');
+      if (
+        err.message?.includes('models_code_axle_cabin_year_desc_key') ||
+        err.message?.includes('models_code_axle_cabin_year_key') ||
+        err.message?.includes('models_code_model_year_key')
+      ) {
+        setErrorMsg(
+          '같은 모델 코드 + 축 + 캐빈 + Model Year + 기타특징 조합이 이미 등록되어 있습니다.\n기존 모델을 편집하거나 기타특징 값을 변경해주세요.'
+        );
       } else {
         setErrorMsg(err.message);
       }
@@ -505,8 +547,13 @@ export default function AdminModelEdit() {
           </div>
 
           {/* 저장 버튼 */}
+          {warnMsg && (
+            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-300 rounded-lg p-3 whitespace-pre-line">
+              {warnMsg}
+            </div>
+          )}
           {errorMsg && parseStatus !== 'error' && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 whitespace-pre-line">
               {errorMsg}
             </div>
           )}
