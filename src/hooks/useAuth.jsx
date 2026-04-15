@@ -58,16 +58,12 @@ export function AuthProvider({ children }) {
   }
 
   async function signUp(email, password, name) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } }, // 트리거가 raw_user_meta_data->>'name' 으로 읽어 profiles 자동 생성
+    });
     if (error) throw error;
-
-    // profiles 테이블에 기본 role 'sales'로 등록
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({ id: data.user.id, name, role: 'sales' });
-      if (profileError) throw profileError;
-    }
   }
 
   async function signOut() {
