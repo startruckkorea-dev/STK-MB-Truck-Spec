@@ -9,7 +9,7 @@ import { useAuth } from '../hooks/useAuth';
  * dict:  { [code]: { name_ko, hex_color, is_hidden, category } }
  * onToggleHide: (specId, currentIsHidden) => void  — admin 전용 인라인 숨김 토글
  */
-export default function SpecTable({ specs, dict, onToggleHide }) {
+export default function SpecTable({ specs, dict, language = 'ko', onToggleHide }) {
   const { isAdmin, canViewCodes } = useAuth();
 
   // 카테고리별 그룹핑
@@ -23,6 +23,7 @@ export default function SpecTable({ specs, dict, onToggleHide }) {
           category={category}
           items={items}
           dict={dict}
+          language={language}
           isAdmin={isAdmin}
           canViewCodes={canViewCodes}
           onToggleHide={onToggleHide}
@@ -32,7 +33,7 @@ export default function SpecTable({ specs, dict, onToggleHide }) {
   );
 }
 
-function CategoryGroup({ category, items, dict, isAdmin, canViewCodes, onToggleHide }) {
+function CategoryGroup({ category, items, dict, language, isAdmin, canViewCodes, onToggleHide }) {
   const [open, setOpen] = useState(true);
 
   // 숨겨진 항목 개수 (sales는 아예 렌더 안 함)
@@ -74,6 +75,12 @@ function CategoryGroup({ category, items, dict, isAdmin, canViewCodes, onToggleH
               displayValue = canViewCodes
                 ? <span className="font-mono text-xs">{spec.spec_value}</span>
                 : <span className="text-xs sm:text-sm text-gray-500">{spec.spec_value}</span>;
+            } else if (language === 'en') {
+              // 영문 모드: name_en 우선, 없으면 원본 코드 폴백
+              const enText = dictEntry?.name_en || spec.spec_value;
+              displayValue = dictEntry?.hex_color
+                ? <ColorSwatch hexColor={dictEntry.hex_color} label={enText} />
+                : <span className="text-xs sm:text-sm">{enText}</span>;
             } else if (dictEntry) {
               displayValue = dictEntry.is_color && dictEntry.hex_color
                 ? <ColorSwatch hexColor={dictEntry.hex_color} nameKo={dictEntry.name_ko} />

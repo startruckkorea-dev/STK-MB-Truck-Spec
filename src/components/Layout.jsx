@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import LangToggle from './ui/LangToggle';
 
 const ROLE_LABEL = { admin: '관리자', staff: '본사직원', sales: '영업직원' };
 const ROLE_BADGE_CLS = {
@@ -93,8 +94,11 @@ export default function Layout({ children }) {
               )}
             </nav>
 
-            {/* 우측: 사용자 + 로그아웃 (데스크톱) + 햄버거 (모바일) */}
+            {/* 우측: 언어 토글 + 사용자 + 로그아웃 (데스크톱) + 햄버거 (모바일) */}
             <div className="flex items-center gap-2 min-w-0">
+              <div className="hidden sm:block">
+                <LangToggle />
+              </div>
               <span className="text-xs text-gray-500 hidden sm:block truncate max-w-[120px]">
                 {profile?.name || profile?.role}
               </span>
@@ -185,6 +189,9 @@ export default function Layout({ children }) {
                 </>
               )}
               <div className="border-t border-gray-100 pt-2 mt-1">
+                <div className="px-3 py-2">
+                  <LangToggle />
+                </div>
                 <div className="px-3 py-1 text-xs text-gray-400">
                   {profile?.name || profile?.role}
                 </div>

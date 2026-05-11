@@ -6,6 +6,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { useModelDetail } from '../hooks/useModels';
 import { useAuth } from '../hooks/useAuth';
+import { useSpecLang } from '../hooks/useSpecLang';
 import { supabase } from '../lib/supabase';
 import { exportDetailToExcel, exportDetailToPDF } from '../lib/export';
 
@@ -17,6 +18,7 @@ export default function ModelDetail() {
   const [specs, setSpecs] = useState([]);
   const [notes, setNotes] = useState([]);
   const [dict, setDict] = useState({});
+  const [lang] = useSpecLang();
 
   // initialSpecs가 로드되면 로컬 상태로 복사
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function ModelDetail() {
     if (specValues.length === 0) return;
     supabase
       .from('code_dict')
-      .select('code, name_ko, hex_color, is_hidden, category')
+      .select('code, name_ko, name_en, hex_color, is_hidden, category')
       .in('code', specValues)
       .then(({ data }) => {
         if (data) {
@@ -118,18 +120,18 @@ export default function ModelDetail() {
               <p className="text-xs sm:text-sm text-gray-400 mt-1">{model.code_desc}</p>
             )}
           </div>
-          <div className="flex gap-2 flex-shrink-0 flex-wrap">
+          <div className="flex gap-2 flex-shrink-0 flex-wrap items-center">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportDetailToExcel(model, specs, dict, notes)}
+              onClick={() => exportDetailToExcel(model, specs, dict, notes, lang)}
             >
               Excel
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportDetailToPDF(model, specs, dict, notes)}
+              onClick={() => exportDetailToPDF(model, specs, dict, notes, lang)}
             >
               PDF
             </Button>
@@ -169,7 +171,7 @@ export default function ModelDetail() {
           등록된 사양이 없습니다.
         </div>
       ) : (
-        <SpecTable specs={specs} dict={dict} onToggleHide={isAdmin ? toggleSpecHidden : undefined} />
+        <SpecTable specs={specs} dict={dict} language={lang} onToggleHide={isAdmin ? toggleSpecHidden : undefined} />
       )}
     </Layout>
   );

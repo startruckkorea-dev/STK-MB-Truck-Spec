@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import CompareTable from '../components/CompareTable';
 import Button from '../components/ui/Button';
+import { useSpecLang } from '../hooks/useSpecLang';
 import { supabase } from '../lib/supabase';
 import { exportCompareToExcel, exportCompareToPDF } from '../lib/export';
 
@@ -17,6 +18,7 @@ export default function Compare() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showDiffOnly, setShowDiffOnly] = useState(false);
+  const [lang] = useSpecLang();
 
   useEffect(() => {
     if (ids.length < 2) { setLoading(false); return; }
@@ -71,7 +73,7 @@ export default function Compare() {
       if (allCodes.length > 0) {
         const { data: dData } = await supabase
           .from('code_dict')
-          .select('code, name_ko, hex_color, is_hidden, category')
+          .select('code, name_ko, name_en, hex_color, is_hidden, category')
           .in('code', allCodes);
         if (dData) {
           dData.forEach((r) => { dictData[r.code] = r; });
@@ -138,7 +140,7 @@ export default function Compare() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly)}
+            onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly, lang)}
             disabled={loading || models.length === 0}
           >
             Excel
@@ -146,7 +148,7 @@ export default function Compare() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly)}
+            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly, lang)}
             disabled={loading || models.length === 0}
           >
             PDF
@@ -168,7 +170,7 @@ export default function Compare() {
 
       {!loading && !error && models.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <CompareTable models={models} specsMap={specsMap} notesMap={notesMap} dict={dict} showDiffOnly={showDiffOnly} />
+          <CompareTable models={models} specsMap={specsMap} notesMap={notesMap} dict={dict} showDiffOnly={showDiffOnly} language={lang} />
         </div>
       )}
     </Layout>

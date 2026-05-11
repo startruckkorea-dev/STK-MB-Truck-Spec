@@ -10,14 +10,14 @@ import { useAuth } from '../hooks/useAuth';
  * specsMap: { [modelId]: Spec[] }
  * dict: { [code]: { name_ko, hex_color, is_hidden, category } }
  */
-export default function CompareTable({ models, specsMap, notesMap = {}, dict, showDiffOnly = false }) {
+export default function CompareTable({ models, specsMap, notesMap = {}, dict, showDiffOnly = false, language = 'ko' }) {
   const { isAdmin } = useAuth();
 
   // 모든 모델의 spec_key 유니온 (카테고리 + 순서 유지)
   const allKeys = buildAllKeys(models, specsMap, isAdmin, dict);
 
   // showDiffOnly 시 diff 여부를 미리 계산
-  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, isAdmin) : null;
+  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, isAdmin, language) : null;
 
   const hasAnyNotes = models.some((m) => (notesMap[m.id] ?? []).length > 0);
 
@@ -115,8 +115,9 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
             // 유효한 값만 추출 (비교용)
             const displayValues = values.map((spec) => {
               if (!spec) return null;
-              const entry = dict[spec.spec_value];
               if (!spec.use_translate) return spec.spec_value;
+              const entry = dict[spec.spec_value];
+              if (language === 'en') return entry?.name_en || spec.spec_value;
               return entry?.name_ko ?? null;
             });
 
@@ -141,7 +142,7 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
                 {values.map((spec, i) => (
                   <td key={models[i].id} className="px-2 sm:px-4 py-1.5 sm:py-2.5 align-top">
                     {spec ? (
-                      <SpecValue spec={spec} dict={dict} />
+                      <SpecValue spec={spec} dict={dict} language={language} />
                     ) : (
                       <span className="text-gray-300">—</span>
                     )}
@@ -156,10 +157,16 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
   );
 }
 
-function SpecValue({ spec, dict }) {
+function SpecValue({ spec, dict, language = 'ko' }) {
   const entry = dict[spec.spec_value];
   if (!spec.use_translate) {
     return <span className="font-mono text-sm text-gray-800">{spec.spec_value}</span>;
+  }
+  if (language === 'en') {
+    const enText = entry?.name_en || spec.spec_value;
+    return entry?.hex_color
+      ? <ColorSwatch hexColor={entry.hex_color} label={enText} size="sm" />
+      : <span className="text-sm sm:text-base text-gray-800">{enText}</span>;
   }
   if (!entry) {
     return <span className="text-amber-400 text-sm">번역 미등록</span>;
@@ -171,7 +178,7 @@ function SpecValue({ spec, dict }) {
 }
 
 // 차이가 있는 spec_key와 해당 카테고리를 Set으로 반환
-function buildDiffSet(allKeys, models, specsMap, dict, isAdmin) {
+function buildDiffSet(allKeys, models, specsMap, dict, isAdmin, language = 'ko') {
   const specKeys = new Set();
   const categories = new Set();
 
@@ -182,8 +189,9 @@ function buildDiffSet(allKeys, models, specsMap, dict, isAdmin) {
       const spec = specs.find((s) => s.spec_key === row.spec_key);
       if (!spec) return null;
       if (!isAdmin && (spec.is_hidden || dict[spec.spec_value]?.is_hidden)) return null;
-      const entry = dict[spec.spec_value];
       if (!spec.use_translate) return spec.spec_value;
+      const entry = dict[spec.spec_value];
+      if (language === 'en') return entry?.name_en || spec.spec_value;
       return entry?.name_ko ?? null;
     });
     const unique = new Set(displayValues.filter(Boolean));

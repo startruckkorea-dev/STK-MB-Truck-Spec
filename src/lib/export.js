@@ -143,7 +143,7 @@ function modelFullName(m) {
   return `${m.series} ${m.code}${m.axle ? ` ${m.axle}` : ''}${m.cabin ? ` ${m.cabin}` : ''}`;
 }
 
-export async function exportDetailToExcel(model, specs, dict, notes = []) {
+export async function exportDetailToExcel(model, specs, dict, notes = [], language = 'ko') {
   const title = `${modelFullName(model)} (${model.model_year})`;
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(title.slice(0, 31));
@@ -177,20 +177,21 @@ export async function exportDetailToExcel(model, specs, dict, notes = []) {
   groups.forEach(({ category, items }) => {
     applyCategoryRow(ws, category, colCount);
     items.forEach((spec, i) => {
-      const translated = resolveValue(spec, dict);
+      const translated = resolveValue(spec, dict, language);
       applyDataRow(ws, [spec.label_ko || spec.spec_key, spec.spec_value, translated], { even: i % 2 === 0 });
     });
   });
 
   finalizeSheet(ws);
-  await saveWorkbook(wb, `${sanitizeFilename(title)}.xlsx`);
+  const suffix = language === 'en' ? '_EN' : '';
+  await saveWorkbook(wb, `${sanitizeFilename(title)}${suffix}.xlsx`);
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  사양 상세 — PDF (브라우저 인쇄)
 // ═══════════════════════════════════════════════════════════════
 
-export function exportDetailToPDF(model, specs, dict, notes = []) {
+export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko') {
   const title = `${modelFullName(model)} (${model.model_year})`;
   const groups = groupByCategory(specs.filter((s) => !s.is_hidden));
 
@@ -216,7 +217,7 @@ export function exportDetailToPDF(model, specs, dict, notes = []) {
           <tr class="${i % 2 === 0 ? 'even' : ''}">
             <td>${esc(spec.label_ko || spec.spec_key)}</td>
             <td class="code">${esc(spec.spec_value)}</td>
-            <td>${esc(resolveValue(spec, dict))}</td>
+            <td>${esc(resolveValue(spec, dict, language))}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -230,9 +231,9 @@ export function exportDetailToPDF(model, specs, dict, notes = []) {
 //  비교 — Excel
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}, showDiffOnly = false) {
+export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}, showDiffOnly = false, language = 'ko') {
   const allKeys = buildAllKeys(models, specsMap, dict);
-  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict) : null;
+  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, language) : null;
 
   const wb = new ExcelJS.Workbook();
   const sheetName = `비교_${models.map((m) => m.code).join('_')}`.slice(0, 31);
@@ -284,7 +285,7 @@ export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}
       const specs = specsMap[m.id] ?? [];
       const spec = specs.find((s) => s.spec_key === row.spec_key);
       if (!spec) return '—';
-      return resolveValue(spec, dict);
+      return resolveValue(spec, dict, language);
     });
 
     const uniqueVals = new Set(values.filter((v) => v !== '—'));
@@ -299,16 +300,17 @@ export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}
   });
 
   finalizeSheet(ws);
-  await saveWorkbook(wb, `${sanitizeFilename(sheetName)}.xlsx`);
+  const suffix = language === 'en' ? '_EN' : '';
+  await saveWorkbook(wb, `${sanitizeFilename(sheetName)}${suffix}.xlsx`);
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  비교 — PDF (브라우저 인쇄)
 // ═══════════════════════════════════════════════════════════════
 
-export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDiffOnly = false) {
+export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDiffOnly = false, language = 'ko') {
   const allKeys = buildAllKeys(models, specsMap, dict);
-  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict) : null;
+  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, language) : null;
 
   const title = `모델 비교: ${models.map((m) => modelFullName(m)).join(' vs ')}`;
   const modelHeaders = models.map((m) => `<th>${esc(modelFullName(m))}<br><small>${m.model_year}</small></th>`).join('');
@@ -364,7 +366,7 @@ export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDi
       const specs = specsMap[m.id] ?? [];
       const spec = specs.find((s) => s.spec_key === row.spec_key);
       if (!spec) return '—';
-      return resolveValue(spec, dict);
+      return resolveValue(spec, dict, language);
     });
 
     const uniqueVals = new Set(values.filter((v) => v !== '—'));
@@ -519,9 +521,10 @@ function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function resolveValue(spec, dict) {
+function resolveValue(spec, dict, language = 'ko') {
   if (!spec.use_translate) return spec.spec_value || '';
   const entry = dict[(spec.spec_value || '').trim().toUpperCase()];
+  if (language === 'en') return (entry?.name_en) || spec.spec_value || '';
   if (!entry) return spec.spec_value || '';
   return entry.name_ko || spec.spec_value;
 }
@@ -567,7 +570,7 @@ function buildAllKeys(models, specsMap, dict) {
   return result;
 }
 
-function buildDiffSet(allKeys, models, specsMap, dict) {
+function buildDiffSet(allKeys, models, specsMap, dict, language = 'ko') {
   const specKeys = new Set();
   const categories = new Set();
   allKeys.forEach((row) => {
@@ -576,7 +579,7 @@ function buildDiffSet(allKeys, models, specsMap, dict) {
       const specs = specsMap[m.id] ?? [];
       const spec = specs.find((s) => s.spec_key === row.spec_key);
       if (!spec) return null;
-      return resolveValue(spec, dict);
+      return resolveValue(spec, dict, language);
     });
     const unique = new Set(vals.filter(Boolean));
     const hasAbsent = vals.some((v) => v === null);
