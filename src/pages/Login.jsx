@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { signInWithMicrosoft } from '../lib/msal';
 import Button from '../components/ui/Button';
 
 export default function Login() {
@@ -11,9 +12,28 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [signupDone, setSignupDone] = useState(false);
+  const [msLoading, setMsLoading] = useState(false);
+  const [msAccount, setMsAccount] = useState(null);
 
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
+
+  async function handleMicrosoftLogin() {
+    setError('');
+    setMsLoading(true);
+    try {
+      const account = await signInWithMicrosoft();
+      setMsAccount(account);
+      // 골격 단계: 인증만 확인. SharePoint(Graph) 데이터 연동은 다음 단계에서 연결.
+      console.log('[MSAL] 로그인 성공:', account);
+    } catch (err) {
+      if (err?.errorCode !== 'user_cancelled') {
+        setError('Microsoft 365 로그인 중 오류가 발생했습니다. (' + (err?.errorCode || err?.message || 'unknown') + ')');
+      }
+    } finally {
+      setMsLoading(false);
+    }
+  }
 
   function switchMode(next) {
     setMode(next);
@@ -175,6 +195,44 @@ export default function Login() {
                   : (mode === 'login' ? '로그인' : '회원가입')}
               </Button>
             </form>
+          )}
+        </div>
+
+        {/* ─── Microsoft 365 로그인 (골격 — SharePoint 연동 준비) ─── */}
+        <div className="mt-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400">또는</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          {msAccount ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center space-y-1">
+              <p className="text-sm font-medium text-gray-800">
+                ✓ Microsoft 365 연결됨
+              </p>
+              <p className="text-xs text-gray-500 break-all">
+                {msAccount.username || msAccount.name}
+              </p>
+              <p className="text-[11px] text-gray-400 pt-1">
+                SharePoint 데이터 연동은 다음 단계에서 활성화됩니다.
+              </p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleMicrosoftLogin}
+              disabled={msLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition disabled:opacity-60"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 23 23" aria-hidden="true">
+                <rect x="1" y="1" width="10" height="10" fill="#F25022" />
+                <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
+                <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
+                <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
+              </svg>
+              {msLoading ? '연결 중...' : 'Microsoft 365 계정으로 로그인'}
+            </button>
           )}
         </div>
 

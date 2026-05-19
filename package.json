@@ -10,6 +10,7 @@
     "sync-codes": "node scripts/sync-codes.mjs"
   },
   "dependencies": {
+    "@azure/msal-browser": "^3.30.0",
     "@supabase/supabase-js": "^2.47.0",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
