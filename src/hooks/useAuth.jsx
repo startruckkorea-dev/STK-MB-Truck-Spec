@@ -1,38 +1,73 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, useMemo } from 'react';
+import { EventType } from '@azure/msal-browser';
 import { supabase } from '../lib/supabase';
+import {
+  msalInstance,
+  initMsal,
+  getMicrosoftAccount,
+  signOutMicrosoft,
+} from '../lib/msal';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
+  const [supaUser, setSupaUser] = useState(null);
+  const [supaProfile, setSupaProfile] = useState(null);
+  const [msAccount, setMsAccount] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // ─── MSAL: 초기화 + 이벤트 구독 ─────────────────────────────────
   useEffect(() => {
-    // 안전망: 5초 내 응답 없으면 로딩 해제
+    let unsubscribe;
+    (async () => {
+      await initMsal();
+      setMsAccount(getMicrosoftAccount());
+      const callbackId = msalInstance.addEventCallback((event) => {
+        switch (event.eventType) {
+          case EventType.LOGIN_SUCCESS:
+          case EventType.ACQUIRE_TOKEN_SUCCESS:
+          case EventType.ACCOUNT_ADDED:
+            if (event.payload?.account) {
+              msalInstance.setActiveAccount(event.payload.account);
+              setMsAccount(event.payload.account);
+            }
+            break;
+          case EventType.LOGOUT_SUCCESS:
+          case EventType.ACCOUNT_REMOVED:
+            setMsAccount(null);
+            break;
+          default:
+            break;
+        }
+      });
+      unsubscribe = () => callbackId && msalInstance.removeEventCallback(callbackId);
+    })();
+    return () => unsubscribe && unsubscribe();
+  }, []);
+
+  // ─── Supabase: 기존 세션 폴백 (다음 세션에 SharePoint로 대체 예정) ─
+  useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 5000);
 
-    // 초기 세션 확인
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(timer);
-      setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else setLoading(false);
-    }).catch(() => {
-      clearTimeout(timer);
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        clearTimeout(timer);
+        setSupaUser(session?.user ?? null);
+        if (session?.user) fetchProfile(session.user.id);
+        else setLoading(false);
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        setLoading(false);
+      });
 
-    // 인증 상태 변화 감지
-    // 주의: onAuthStateChange 콜백 안에서 직접 await로 Supabase API를 호출하면
-    // 내부 lock deadlock이 발생함 → setTimeout으로 defer 처리
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setUser(session?.user ?? null);
+        setSupaUser(session?.user ?? null);
         if (session?.user) {
           setTimeout(() => fetchProfile(session.user.id), 0);
         } else {
-          setProfile(null);
+          setSupaProfile(null);
           setLoading(false);
         }
       }
@@ -48,36 +83,46 @@ export function AuthProvider({ children }) {
       .eq('id', userId)
       .single();
 
-    if (!error) setProfile(data);
+    if (!error) setSupaProfile(data);
     setLoading(false);
   }
 
-  async function signIn(email, password) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-  }
-
-  async function signUp(email, password, name) {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } }, // 트리거가 raw_user_meta_data->>'name' 으로 읽어 profiles 자동 생성
-    });
-    if (error) throw error;
-  }
-
   async function signOut() {
-    await supabase.auth.signOut();
+    if (msAccount) {
+      try { await signOutMicrosoft(); } catch (_) { /* 팝업 차단 등 무시 */ }
+    }
+    if (supaUser) {
+      await supabase.auth.signOut();
+    }
   }
+
+  // ─── 통합 user / profile (MS 우선) ─────────────────────────────
+  const { user, profile } = useMemo(() => {
+    if (msAccount) {
+      const unified = {
+        id: msAccount.localAccountId || msAccount.homeAccountId,
+        email: msAccount.username,
+        name: msAccount.name || msAccount.username,
+        provider: 'microsoft',
+      };
+      // 임시: MS-인증 사용자는 모두 admin. 역할 세분화는 SharePoint 연동 단계에서 재설계.
+      return {
+        user: unified,
+        profile: { ...unified, role: 'admin' },
+      };
+    }
+    return { user: supaUser, profile: supaProfile };
+  }, [msAccount, supaUser, supaProfile]);
 
   const isAdmin = profile?.role === 'admin';
   const isStaff = profile?.role === 'staff';
   const isSales = profile?.role === 'sales';
-  // admin + staff 는 영문 코드를 볼 수 있음; sales 는 국문명만 표시
   const canViewCodes = isAdmin || isStaff;
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut, isAdmin, isStaff, isSales, canViewCodes }}>
+    <AuthContext.Provider
+      value={{ user, profile, loading, signOut, isAdmin, isStaff, isSales, canViewCodes }}
+    >
       {children}
     </AuthContext.Provider>
   );
