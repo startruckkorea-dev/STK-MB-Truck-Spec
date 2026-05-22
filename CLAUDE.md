@@ -12,7 +12,7 @@
 해결 목표:
 - 영문 코드 → 국문 자동 번역 표시
 - 아이폰 모델 비교처럼 모델 간 사양 비교
-- 계정별 로그인으로 사내 인원만 접근
+- 사내 계정 로그인으로 사내 인원만 접근
 
 ---
 
@@ -22,9 +22,14 @@
 |---|---|
 | 프론트엔드 | React + Vite |
 | 스타일 | Tailwind CSS |
-| 백엔드/DB/Auth | Supabase |
+| 인증 | Microsoft 365 (MSAL / Azure Entra ID) |
+| 데이터 저장 | SharePoint Excel 워크북 (Microsoft Graph Workbook API) |
 | 파일 파싱 | mammoth.js (.docx → JSON) |
 | 배포 | Vercel |
+
+> **이력:** 2026-05 이전에는 백엔드/DB/Auth 를 Supabase 로 사용했다. 현재는 Supabase 를
+> 완전히 제거하고, 인증은 Microsoft 365, 데이터는 SharePoint Excel 로 이전했다.
+> (Supabase 관련 코드·스키마·문서는 모두 폐기됨)
 
 ---
 
@@ -32,126 +37,116 @@
 
 | 역할 | 권한 |
 |---|---|
-| `sales` 영업직원 | 모델 목록 조회, 사양 상세, 비교 |
-| `admin` 관리자(상품기획팀) | 위 전체 + 모델 등록/수정, 코드 사전 관리, 워드 파일 업로드 |
+| `sales` 영업직원 | 모델 목록 조회, 사양 상세(국문 표시), 비교 |
+| `staff` 본사직원 | 위 + 영문 코드 열람 |
+| `admin` 관리자(상품기획팀) | 위 전체 + 모델 등록/수정, 코드 사전 관리, 사용자 관리 |
 
-규모: 10~50명 (계정별 로그인, Supabase Auth 사용)
+- **로그인:** Microsoft 365 회사 계정 (MSAL 팝업). 이메일/비밀번호 직접 입력 없음.
+- **역할:** SharePoint 워크북의 `users` 시트로 관리 (`/admin/users` 에서 편집).
+- **부트스트랩:** `users` 시트에 `admin` 이 한 명도 없으면 로그인한 사용자를 모두 `admin`
+  으로 취급(최초 셋업용). admin 이 한 명이라도 등록되면, 미등록 사용자는 `sales` 기본.
+- ⚠️ 앱을 쓰려면 SharePoint 워크북 파일의 **"읽기" 권한**도 필요하다 (관리자는 "편집").
+  규모 10~50명.
 
 ---
 
 ## 핵심 기능 명세
 
-### 1. 로그인
-- Supabase Auth (이메일 + 비밀번호)
-- 역할(role)은 Supabase `profiles` 테이블에서 관리
-- 로그인 후 role에 따라 네비게이션 메뉴 다르게 표시
+### 1. 로그인 (`/login`)
+- Microsoft 365 계정으로 로그인 (MSAL 팝업)
+- 로그인 후 역할(`users` 시트)에 따라 네비게이션 메뉴 다르게 표시
 
 ### 2. 모델 목록 페이지 (`/models`)
-- 등록된 모델 카드 그리드 표시
-- 필터: 연식(year), 시리즈(Actros / Arocs / Atego)
+- 등록된 모델 카드 그리드 표시 (MY별·차종별 그룹)
+- 필터: 연식(model_year), 시리즈(Actros / Arocs / Atego)
 - 검색: 모델 코드, 국문명 텍스트 검색
 - 각 카드에서 [사양 상세 보기] / [비교 추가] 가능
 - 비교 선택 시 하단 고정 바(compare bar) 표시, 최대 3개
+- `sales`/`staff` 에게는 `is_visible=false` 모델 숨김 (admin 은 전체)
 
 ### 3. 사양 상세 페이지 (`/models/:id`)
 - 카테고리별 사양 테이블
 - 각 행: 항목명(국문) / 영문 코드 / 번역된 값
 - 외장 컬러 코드 → 컬러 스와치 + 국문명 표시
-- 타이어 코드 → 규격 국문 표시
 
 ### 4. 모델 비교 페이지 (`/compare?ids=1,2,3`)
 - 선택한 2~3개 모델 좌우 나란히 비교 테이블
-- 값이 다른 항목 하이라이트 표시
-- 동일 항목은 흐리게 표시 (차이점 강조)
+- 값이 다른 항목 하이라이트, 동일 항목은 흐리게
 
-### 5. 관리자 — 모델 등록 (`/admin/models/new`)
+### 5. 관리자 — 모델 등록/편집 (`/admin/models/new`, `/admin/models/:id/edit`)
 - 워드 파일(.docx) 업로드 → mammoth.js로 파싱
-- 파싱된 영문 코드를 코드 사전(code_dict 테이블)과 매핑
-- 매핑 확인 후 저장
+- 파싱된 영문 코드를 코드 사전(`code_dict` 시트)과 매핑해 미리보기
+- 확인 후 저장 → `models` / `specs` / `model_notes` 시트에 기록
 
 ### 6. 관리자 — 코드 번역 사전 (`/admin/dict`)
-- 영문 코드 ↔ 국문명 CRUD
-- 분류(엔진 / 변속기 / 타이어 / 외장 컬러 / 안전장비 등)
-- 컬러 코드의 경우 HEX값 추가 입력
+- `code_dict` 시트 CRUD (영문 코드 ↔ 국문명, 분류, HEX 컬러, 숨김)
+- 상단 패널에서 SharePoint Excel 파일 바로 열기 + [다시 불러오기]
+
+### 7. 관리자 — 사용자 (`/admin/users`)
+- `users` 시트 CRUD (이메일, 이름, 역할, 활성)
 
 ---
 
-## 데이터베이스 스키마 (Supabase PostgreSQL)
+## 데이터 저장 구조 — SharePoint Excel 워크북
 
-```sql
--- 사용자 프로필 및 역할
-create table profiles (
-  id uuid references auth.users primary key,
-  name text,
-  role text check (role in ('admin', 'sales')) default 'sales',
-  created_at timestamptz default now()
-);
+**위치:** SharePoint 사이트 `STK-PMM` > `Shared Documents` > `mbtruck-spec/Code/` 폴더 안의
+`.xlsx` 파일 1개. 앱([src/lib/workbook.js](src/lib/workbook.js))이 그 폴더의 `.xlsx` 를
+**자동 탐색**한다 (파일명 무관, 폴더에 `.xlsx` 는 하나만 둘 것).
 
--- 모델 기본 정보
-create table models (
-  id serial primary key,
-  series text not null,           -- 'Actros', 'Arocs', 'Atego'
-  code text not null,             -- 생산 코드 예: 'P530LA'
-  code_desc text,                 -- 코드 영문 설명
-  name_ko text not null,          -- 국문 모델명
-  year int not null,              -- 연식
-  badge text,                     -- 'new' | 'updated' | null
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
+워크북은 시트 5개. 각 시트 **1행 = 헤더, 2행부터 데이터**. 컬럼 **순서**가 중요하다
+(앱이 위치 기준으로 읽음). 불리언은 `TRUE`/`FALSE`.
 
--- 사양 항목 (카테고리 + 키-값)
-create table specs (
-  id serial primary key,
-  model_id int references models(id) on delete cascade,
-  category text not null,         -- '엔진', '변속기', '타이어' 등
-  spec_key text not null,         -- 영문 코드 키 예: 'ENG_CODE'
-  spec_value text not null,       -- 값 예: 'OM471'
-  label_ko text,                  -- 항목 국문명 예: '엔진 코드'
-  use_translate boolean default false,  -- 코드 사전 번역 여부
-  is_color boolean default false,       -- 컬러 코드 여부
-  sort_order int default 0
-);
+| 시트 | 컬럼 (순서대로) |
+|---|---|
+| `code_dict` | id, code, name_en, name_ko, category, hex_color, is_hidden |
+| `models` | id, series, code, axle, cabin, code_desc, name_ko, model_year, badge, is_visible |
+| `specs` | id, model_id, category, spec_key, spec_value, label_ko, use_translate, is_color, is_hidden, sort_order |
+| `model_notes` | id, model_id, label, content, sort_order |
+| `users` | email, name, role, is_active |
 
--- 코드 번역 사전
--- ※ 원본 데이터: code/mb_codes_total_translated.xlsx (A=코드, B=영문, C=국문)
-create table code_dict (
-  id serial primary key,
-  code text unique not null,      -- 'OM471', 'G211', '861' 등
-  name_en text,                   -- 영문 설명 (Excel B열)
-  name_ko text not null,          -- '직렬 6기통 디젤 (OM471)'
-  category text,                  -- '엔진', '변속기', '외장 컬러' 등 (수동 입력)
-  hex_color text,                 -- 컬러 코드일 경우 '#1a1a1a' (수동 입력)
-  is_active boolean not null default true,  -- false = Excel에서 삭제된 코드 (소프트 삭제)
-  updated_at timestamptz default now(),
-  created_at timestamptz default now()
-);
-```
+**관계:**
+- `specs.model_id`, `model_notes.model_id` → `models.id`
+- `specs.spec_value` → `code_dict` 의 코드 (문자열 매칭, 숫자 FK 아님)
+- `id` 는 정수. 신규 행 삽입 시 `max(id)+1`.
+
+**code_dict 의 두 유형 (혼재):**
+- 유형 A (대량 사전): `code` 열=영문 설명, `category` 열=MB 코드 (예: `A0A`)
+- 유형 B (모델 사양 코드): `code` 열=MB 코드, `name_en`=영문 설명
+- 번역 매칭은 [src/lib/codeIndex.js](src/lib/codeIndex.js) 가 `code`/`category` 양쪽을 보고 처리.
+
+---
+
+## 앱 데이터 계층
+
+| 파일 | 역할 |
+|---|---|
+| [src/lib/msal.js](src/lib/msal.js) | MSAL 초기화, 로그인/로그아웃, Graph 토큰 획득 |
+| [src/lib/graph.js](src/lib/graph.js) | Microsoft Graph REST 호출 (토큰 부착, 429/503 재시도) |
+| [src/lib/workbook.js](src/lib/workbook.js) | 워크북 시트 읽기(usedRange)/쓰기(range PATCH·delete) |
+| [src/lib/codeIndex.js](src/lib/codeIndex.js) | `code_dict` → 코드 인덱스, 사양값 번역 매칭 |
+| [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 5개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
+| [src/hooks/useAuth.jsx](src/hooks/useAuth.jsx) | MSAL 인증 + `users` 시트 기반 역할 |
+| [src/hooks/useDict.js](src/hooks/useDict.js), [src/hooks/useModels.js](src/hooks/useModels.js) | DataContext 캐시 기반 조회 훅 |
+
+동시 편집은 소규모 팀 기준 last-write-wins. 단건 쓰기 전 해당 행을 재확인해 충돌을 완화한다.
 
 ---
 
 ## 디자인 시스템
 
-기존 프로토타입(mb_truck_spec.html) 의 디자인 언어를 유지.
+라이트 테마. Tailwind 토큰은 [tailwind.config.js](tailwind.config.js) 참조.
 
 **색상:**
-- Background: `#0a0c10`
-- Panel: `#111318`
-- Card: `#16191f`
-- Border: `#252830`
-- Accent Blue (MB): `#00ADEF`
-- Text: `#e8eaf0`
-- Muted: `#6b7280`
+- 배경: 흰색 / 회색 계열 (Tailwind `gray-*`)
+- Accent (MB Blue): `#00ADEF` (`mb-blue`), hover `#0099d4` (`mb-blue-dark`)
+- 비교 테이블 차이 항목 하이라이트: `rgba(0,173,239,0.06)` 배경
 
 **폰트:**
-- Display/헤더: `Barlow Condensed` (영문 코드, 타이틀)
-- 본문: `Noto Sans KR` (국문)
-- 코드값: `Roboto Mono`
+- Display/헤더: `Barlow Condensed` (`font-barlow`)
+- 본문: `Noto Sans KR` (`font-noto`)
+- 코드값: `Roboto Mono` (`font-mono`)
 
-**컴포넌트 원칙:**
-- 다크 산업적 UI (메르세데스-벤츠 트럭 브랜드에 맞게)
-- 모바일 퍼스트 (영업직원 현장 사용 고려)
-- 비교 테이블에서 차이 항목은 `rgba(0,173,239,0.12)` 배경 하이라이트
+**원칙:** 모바일 퍼스트 (영업직원 현장 사용 고려), 깔끔한 산업적 UI.
 
 ---
 
@@ -160,152 +155,106 @@ create table code_dict (
 ```
 mb-truck-spec/
 ├── CLAUDE.md                  ← 이 파일
-├── code/
-│   └── mb_codes_total_translated.xlsx  ← 코드 번역 원본 (A=코드, B=영문, C=국문)
 ├── scripts/
-│   └── sync-codes.mjs         ← Excel → Supabase 초기 데이터 로딩 스크립트
-├── supabase/
-│   └── migrations/            ← Supabase SQL 마이그레이션 파일들
+│   ├── export-to-xlsx.mjs     ← (1회성·과거) Supabase → xlsx 추출 스크립트
+│   └── debug-docx.mjs         ← .docx 파싱 디버그용
 ├── public/
 ├── src/
-│   ├── main.jsx
-│   ├── App.jsx
+│   ├── main.jsx               ← Auth → Data → SpecLang Provider 순 래핑
+│   ├── App.jsx                ← 라우팅, RequireAuth / RequireAdmin 가드
 │   ├── lib/
-│   │   ├── supabase.js        ← Supabase 클라이언트
-│   │   └── parser.js          ← .docx 파싱 로직 (mammoth)
+│   │   ├── msal.js            ← Microsoft 365 인증
+│   │   ├── graph.js           ← Microsoft Graph REST 헬퍼
+│   │   ├── workbook.js        ← SharePoint Excel 워크북 액세스
+│   │   ├── codeIndex.js       ← 코드 사전 매칭 유틸
+│   │   ├── parser.js          ← .docx 파싱 (mammoth)
+│   │   └── export.js          ← 사양 Excel/PDF 내보내기
+│   ├── contexts/
+│   │   └── DataContext.jsx    ← SharePoint 데이터 캐시 + 변경 API
 │   ├── components/
-│   │   ├── ui/
-│   │   │   ├── Button.jsx
-│   │   │   ├── Table.jsx
-│   │   │   └── Badge.jsx
-│   │   ├── admin/
-│   │   │   └── ExcelImport.jsx  ← 엑셀 가져오기 컴포넌트 (AdminDict에서 사용)
-│   │   ├── ModelCard.jsx
-│   │   ├── SpecTable.jsx
-│   │   ├── CompareTable.jsx
-│   │   ├── CompareBar.jsx
-│   │   └── ColorSwatch.jsx
+│   │   ├── ui/                ← Button, Badge, Toggle, LangToggle
+│   │   ├── admin/ExcelImport.jsx  ← SharePoint Excel 열기 + 다시 불러오기 패널
+│   │   ├── Layout.jsx, ModelCard.jsx, SpecTable.jsx,
+│   │   ├── CompareTable.jsx, CompareBar.jsx, ColorSwatch.jsx
 │   ├── pages/
-│   │   ├── Login.jsx
-│   │   ├── Models.jsx
-│   │   ├── ModelDetail.jsx
-│   │   ├── Compare.jsx
-│   │   └── admin/
-│   │       ├── AdminModels.jsx
-│   │       └── AdminDict.jsx
+│   │   ├── Login.jsx, Models.jsx, ModelDetail.jsx, Compare.jsx
+│   │   └── admin/AdminModels.jsx, AdminModelEdit.jsx, AdminDict.jsx, AdminUsers.jsx
 │   ├── hooks/
-│   │   ├── useAuth.js
-│   │   └── useModels.js
-│   └── styles/
-│       └── index.css
-├── .env.local                 ← VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY
-├── .gitignore
+│   │   ├── useAuth.jsx, useModels.js, useDict.js, useSpecLang.jsx
+│   └── styles/index.css
+├── .env.local                 ← 선택적 환경변수 (아래 참조, 커밋 금지)
 ├── vite.config.js
 └── package.json
 ```
 
 ---
 
-## Claude Code 시작 명령어 (순서대로 실행)
+## 개발 / 배포
 
-프로젝트 폴더에서 Claude Code를 열고 아래 프롬프트를 순서대로 사용:
-
-### Step 1 — 프로젝트 초기화
-```
-CLAUDE.md를 읽고 전체 프로젝트 구조를 이해해줘.
-그 다음 React + Vite + Tailwind CSS 프로젝트를 세팅하고,
-Supabase 클라이언트 연결까지 해줘.
-패키지: @supabase/supabase-js, mammoth, react-router-dom, xlsx
+```bash
+npm install
+npm run dev          # 로컬 개발 — http://localhost:3000
+npm run build        # 프로덕션 빌드 (dist/)
+npx vercel deploy --prod --yes   # 운영 배포 → mbtruck-spec.startruckkorea.com
 ```
 
-### Step 2 — DB 스키마 적용
-```
-CLAUDE.md의 데이터베이스 스키마를 Supabase SQL Editor에 적용할
-migration 파일을 만들어줘. (supabase/migrations/ 폴더에)
-```
-
-### Step 3 — 인증 구현
-```
-Supabase Auth를 이용한 로그인 페이지와
-useAuth 훅을 만들어줘.
-로그인 후 role이 admin이면 /admin, sales면 /models로 리다이렉트.
-```
-
-### Step 4 — 모델 목록 + 상세
-```
-Models.jsx와 ModelDetail.jsx를 만들어줘.
-Supabase에서 models + specs 테이블을 조인해서 데이터를 불러오고
-code_dict 테이블로 영문 코드를 국문으로 번역해 표시해.
-디자인은 CLAUDE.md의 디자인 시스템을 따라줘.
-```
-
-### Step 5 — 비교 기능
-```
-CompareBar.jsx와 Compare.jsx를 만들어줘.
-최대 3개 모델을 선택해 좌우로 비교하고
-값이 다른 항목은 파란색 배경으로 하이라이트해줘.
-```
-
-### Step 6 — 관리자 기능
-```
-AdminDict.jsx: code_dict 테이블 CRUD UI
-  - 상단에 ExcelImport 컴포넌트 배치 (엑셀 가져오기)
-  - 코드 목록은 is_active=true 필터링
-  - 수동 개별 코드 추가/수정/삭제도 지원
-AdminModels.jsx: .docx 파일 업로드 → mammoth로 파싱 →
-  영문 코드 자동 인식 → 사용자가 확인 후 저장하는 플로우 구현
-ExcelImport.jsx: src/components/admin/ExcelImport.jsx 참고
-```
-
----
-
-## 참고: 기존 프로토타입
-
-`mb_truck_spec.html` 파일이 있다면 참고용 디자인 레퍼런스로 사용.
-(로그인, 모델 카드, 사양 테이블, 비교 UI의 디자인 언어 유지)
+- ⚠️ **로컬 개발 시:** Azure 앱 등록 > 인증 > SPA 플랫폼에 `http://localhost:3000` 리디렉션
+  URI 가 등록돼 있어야 로컬에서 Microsoft 로그인이 된다 (없으면 `AADSTS50011` 오류).
+- `npm run export-codes` — (1회성·과거) Supabase 데이터를 xlsx 로 추출하던 스크립트.
+  마이그레이션 완료 후에는 불필요.
 
 ---
 
 ## 환경변수 (.env.local)
 
-```
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
+모두 **선택 사항**이다. 미설정 시 코드의 기본값을 사용한다 (공개 SPA 식별자·경로이며 비밀값 아님).
 
-# 초기 데이터 로딩 스크립트 전용 (서버사이드용, 절대 커밋 금지)
-# Supabase Dashboard > Settings > API > service_role key
-SUPABASE_SERVICE_KEY=your-service-role-key
+```
+# Microsoft 365 / MSAL — 미설정 시 msal.js 기본값
+VITE_MSAL_CLIENT_ID=...
+VITE_MSAL_TENANT_ID=...
+
+# SharePoint 위치 — 미설정 시 workbook.js 기본값
+VITE_SP_HOSTNAME=startruckkorea.sharepoint.com
+VITE_SP_SITE_PATH=/sites/STK-PMM
+VITE_SP_FOLDER_PATH=mbtruck-spec/Code
+
+# 앱 타이틀
+VITE_APP_TITLE=...
 ```
 
-Supabase 프로젝트는 https://supabase.com 에서 무료로 생성 가능.
+---
+
+## SharePoint / Azure 설정
+
+**Azure Entra ID — SPA 앱 등록:**
+- Client ID: `9b247088-5afb-4622-9c5e-b5f27142761d`
+- Tenant ID: `19cab1f5-21f4-44df-8ac6-96d6ca595203`
+- 위임 권한(관리자 동의 완료): `User.Read`, `Sites.ReadWrite.All`, `Files.ReadWrite.All`, `Mail.Send`
+- 리디렉션 URI(SPA): `https://mbtruck-spec.startruckkorea.com` (로컬 테스트 시 `http://localhost:3000` 추가)
+
+**SharePoint:**
+- 사이트: `https://startruckkorea.sharepoint.com/sites/STK-PMM/`
+- 데이터 워크북 폴더: `Shared Documents/mbtruck-spec/Code/`
+- 앱 사용자는 이 파일 "읽기" 권한, 관리자는 "편집" 권한 필요.
 
 ---
 
 ## 코드 번역 사전 운영 가이드
 
-### 데이터 원본
-`code/mb_codes_total_translated.xlsx` 가 단일 번역 원본(source of truth).
-- A열: 코드 (예: A0A, OM471)
-- B열: 영문 설명
-- C열: 국문 번역
-- 시트명: `mb_codes_translated`
+**원본(source of truth):** SharePoint 워크북의 `code_dict` 시트.
 
-### 최초 데이터 로딩 (개발자 1회)
-```bash
-# 1. .env.local에 SUPABASE_SERVICE_KEY 추가
-# 2. 스크립트 실행
-npm run sync-codes
-# 3. Supabase Table Editor에서 code_dict 4,000+ 행 확인
-```
+**업데이트 방법 두 가지:**
+1. **앱에서:** `/admin/dict` 에서 개별 코드 추가/수정/삭제.
+2. **Excel 직접 편집:** SharePoint 에서 워크북 파일을 열어 `code_dict` 시트를 편집·저장 →
+   앱 `/admin/dict` 상단의 **[다시 불러오기]** 버튼 → 반영.
 
-### 이후 업데이트 (관리자, GUI 방식)
-1. Excel 파일 수정 후 저장
-2. 앱 접속 → 코드 사전 관리 (`/admin/dict`)
-3. **엑셀 가져오기** 버튼 클릭 → 파일 선택
-4. 미리보기 확인 (신규 / 수정 / 비활성화 건수)
-5. **가져오기 확인** 클릭 → 완료
+**주의:** code 가 사전에서 사라지면, 그 코드를 참조하는 모델 사양은 "번역 미등록" 으로
+표시된다. `/admin/dict` 의 "모델 사용 코드" 탭에서 미등록 코드를 확인할 수 있다.
 
-### 소프트 삭제 원칙
-Excel에서 코드를 삭제해도 DB에서 실제 삭제하지 않고 `is_active=false` 처리.
-이유: 기존 사양 데이터(specs 테이블)의 번역 참조가 깨지지 않도록.
-비활성 코드는 AdminDict 하단 "비활성화된 코드" 섹션에서 확인 가능.
+---
+
+## 참고: 기존 프로토타입
+
+초기 디자인 레퍼런스로 `mb_truck_spec.html` 프로토타입이 있었다. 현재 앱은 라이트 테마로
+발전했으므로, 디자인은 위 "디자인 시스템" 섹션과 실제 컴포넌트를 기준으로 한다.
