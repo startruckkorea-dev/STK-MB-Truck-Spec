@@ -32,6 +32,34 @@ export function parseModelYear(text) {
   return null;
 }
 
+// ─── 견적서 파일명에서 기본 정보 추출 ───────────────────────────
+// 예: "Internal quotation hide prices_TR01-1  Actros-L 2863 LS 6x2 G5F 2026-04_(1).docx"
+//      → { series:'Actros', code:'2863LS', axle:'6x2', cabin:'G5F' }
+export function parseQuotationFilename(name) {
+  if (!name) return {};
+  const base = String(name).replace(/\.docx$/i, '');
+  const out = {};
+
+  // 시리즈 (Actros / Arocs / Atego) — "Actros-L" 등 변형 포함
+  const sm = base.match(/\b(Actros|Arocs|Atego)\b/i);
+  if (sm) out.series = sm[1][0].toUpperCase() + sm[1].slice(1).toLowerCase();
+
+  // 축 구성 (6x2, 8x4 ...)
+  const am = base.match(/\b([1-9])\s*[xX]\s*([1-9])\b/);
+  if (am) out.axle = `${am[1]}x${am[2]}`;
+
+  // 모델 코드 (4자리 숫자 + 1~3 영문, 예: "2863 LS" / "2851LS" / "1833L")
+  // 생산연도(2026 등)는 뒤에 영문이 없어 매칭되지 않음
+  const cm = base.match(/\b([1-4]\d{3})\s*([A-Za-z]{1,3})\b/);
+  if (cm) out.code = (cm[1] + cm[2]).toUpperCase();
+
+  // 캐빈 코드 (영문-숫자-영문, 예: G5F / S5F)
+  const km = base.match(/\b([A-Za-z]{1,2}\d[A-Za-z]{1,2})\b/);
+  if (km) out.cabin = km[1].toUpperCase();
+
+  return out;
+}
+
 // ─── 코드 패턴 (영문+숫자 조합, 2~6자) ──────────────────────────
 const CODE_RE = /^[A-Z][A-Z0-9]{1,5}$/;
 

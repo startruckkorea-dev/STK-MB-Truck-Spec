@@ -3,7 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import Button from '../../components/ui/Button';
 import Toggle from '../../components/ui/Toggle';
-import { parseDocx } from '../../lib/parser';
+import SharePointPicker from '../../components/admin/SharePointPicker';
+import { parseDocx, parseQuotationFilename } from '../../lib/parser';
+import { downloadSourceFile } from '../../lib/sourceFiles';
 import { useData } from '../../contexts/DataContext';
 
 const SERIES_OPTIONS = ['Actros', 'Arocs', 'Atego'];
@@ -35,6 +37,7 @@ export default function AdminModelEdit() {
   // idle | parsing | preview | saving | done | error
 
   const [isDragOver, setIsDragOver] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false); // SharePoint 선택 모달
   const [errorMsg, setErrorMsg] = useState('');
   const [warnMsg, setWarnMsg] = useState('');      // 중복 경고 (1회)
   const [duplicateWarned, setDuplicateWarned] = useState(false);
@@ -71,23 +74,40 @@ export default function AdminModelEdit() {
     );
   }, [isEdit, id, models, cachedSpecs, modelNotes]);
 
-  // ── .docx 파일 처리 (공통) ──
-  async function processFile(file) {
+  // ── .docx 처리 (공통) — 로컬 파일/SharePoint 양쪽에서 호출 ──
+  // buffer: ArrayBuffer, filename: 견적서 파일명, folderPath: SharePoint 폴더 경로(선택)
+  async function processArrayBuffer(buffer, filename, folderPath) {
     setParseStatus('parsing');
     setErrorMsg('');
 
     try {
-      console.log('[1] 파일 읽기 시작:', file.name, file.size, 'bytes');
-      const buffer = await file.arrayBuffer();
-      console.log('[2] arrayBuffer 완료, mammoth 파싱 시작...');
       const { specs, modelYear: detectedYear, warnings } = await parseDocx(buffer);
-      console.log('[3] 파싱 완료:', specs.length, '개 사양, MY:', detectedYear);
+      console.log('[parse] 파싱 완료:', specs.length, '개 사양, MY:', detectedYear);
 
       if (specs.length === 0) {
         throw new Error('사양 데이터를 추출하지 못했습니다. .docx 파일 구조를 확인해주세요.');
       }
 
-      if (detectedYear && !modelYear) setModelYear(detectedYear);
+      // ── 파일명/폴더에서 기본 정보 자동 채움 (신규 등록 시에만) ──
+      let yearAlreadySet = modelYear;
+      if (!isEdit) {
+        const info = parseQuotationFilename(filename);
+        if (info.series && SERIES_OPTIONS.includes(info.series)) setSeries(info.series);
+        if (info.code) setCode(info.code);
+        if (info.axle) setAxle(info.axle);
+        if (info.cabin) setCabin(info.cabin);
+        // 폴더 경로의 "MY##" 세그먼트 → Model Year
+        const myFolder = String(folderPath || '')
+          .split('/')
+          .map((s) => s.trim())
+          .find((s) => /^MY\d{2}$/i.test(s));
+        if (myFolder) {
+          setModelYear(myFolder.toUpperCase());
+          yearAlreadySet = myFolder.toUpperCase();
+        }
+      }
+      // 폴더에서 못 얻었으면 .docx 내용에서 감지한 연도 사용
+      if (detectedYear && !yearAlreadySet) setModelYear(detectedYear);
 
       // 코드 사전(SharePoint 캐시)에서 번역 조회 (코드 정규화: trim + uppercase)
       const codes = [...new Set(specs.map((s) => s.spec_value.trim().toUpperCase()))];
@@ -99,6 +119,17 @@ export default function AdminModelEdit() {
       setDictMap(map);
       setParseWarnings(warnings);
       setParseStatus('preview');
+    } catch (err) {
+      setErrorMsg(err.message);
+      setParseStatus('error');
+    }
+  }
+
+  // ── 로컬 파일 처리 ──
+  async function processFile(file) {
+    try {
+      const buffer = await file.arrayBuffer();
+      await processArrayBuffer(buffer, file.name);
     } catch (err) {
       setErrorMsg(err.message);
       setParseStatus('error');
@@ -118,6 +149,20 @@ export default function AdminModelEdit() {
     setIsDragOver(false);
     const file = e.dataTransfer.files[0];
     if (file && file.name.endsWith('.docx')) processFile(file);
+  }
+
+  // ── SharePoint 공유폴더에서 선택 ──
+  async function handleSharePointPick(file, folderPath) {
+    setPickerOpen(false);
+    setParseStatus('parsing');
+    setErrorMsg('');
+    try {
+      const buffer = await downloadSourceFile(file.downloadUrl);
+      await processArrayBuffer(buffer, file.name, folderPath);
+    } catch (err) {
+      setErrorMsg(err.message);
+      setParseStatus('error');
+    }
   }
 
   // ── 개별 사양 숨김 토글 ──
@@ -407,6 +452,24 @@ export default function AdminModelEdit() {
               )}
             </div>
 
+            {/* SharePoint 공유폴더에서 선택 */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400">또는</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              disabled={parseStatus === 'parsing'}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50"
+            >
+              📁 SharePoint 공유폴더에서 선택
+            </button>
+            <p className="text-xs text-gray-400">
+              공유폴더의 견적서를 고르면 시리즈·코드·축·캐빈이 자동 입력됩니다.
+            </p>
+
             {parseStatus === 'error' && (
               <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 whitespace-pre-line">
                 {errorMsg}
@@ -570,6 +633,14 @@ export default function AdminModelEdit() {
           )}
         </div>
       </div>
+
+      {/* SharePoint 견적서 선택 모달 */}
+      {pickerOpen && (
+        <SharePointPicker
+          onPick={handleSharePointPick}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </Layout>
   );
 }
