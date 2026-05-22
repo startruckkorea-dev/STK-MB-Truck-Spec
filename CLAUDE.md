@@ -74,7 +74,12 @@
 - 값이 다른 항목 하이라이트, 동일 항목은 흐리게
 
 ### 5. 관리자 — 모델 등록/편집 (`/admin/models/new`, `/admin/models/:id/edit`)
-- 워드 파일(.docx) 업로드 → mammoth.js로 파싱
+- 사양서(.docx) 가져오기 — 두 가지 경로:
+  1. **로컬 PC 업로드:** 드래그 앤 드롭 또는 파일 선택
+  2. **SharePoint 공유폴더에서 선택:** [SharePointPicker](src/components/admin/SharePointPicker.jsx)
+     모달로 견적서 폴더(MY 연도 → 생산월 → 파일)를 탐색해 .docx 를 바로 선택
+- 둘 다 mammoth.js로 파싱. 신규 등록 시 견적서 **파일명**에서 시리즈·모델 코드·축·캐빈을,
+  SharePoint **폴더명**(`MY##`)에서 Model Year 를 자동 입력 (관리자가 확인·수정)
 - 파싱된 영문 코드를 코드 사전(`code_dict` 시트)과 매핑해 미리보기
 - 확인 후 저장 → `models` / `specs` / `model_notes` 시트에 기록
 
@@ -123,6 +128,7 @@
 | [src/lib/msal.js](src/lib/msal.js) | MSAL 초기화, 로그인/로그아웃, Graph 토큰 획득 |
 | [src/lib/graph.js](src/lib/graph.js) | Microsoft Graph REST 호출 (토큰 부착, 429/503 재시도) |
 | [src/lib/workbook.js](src/lib/workbook.js) | 워크북 시트 읽기(usedRange)/쓰기(range PATCH·delete) |
+| [src/lib/sourceFiles.js](src/lib/sourceFiles.js) | SharePoint 견적서(.docx) 원본 폴더 탐색·다운로드 |
 | [src/lib/codeIndex.js](src/lib/codeIndex.js) | `code_dict` → 코드 인덱스, 사양값 번역 매칭 |
 | [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 5개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
 | [src/hooks/useAuth.jsx](src/hooks/useAuth.jsx) | MSAL 인증 + `users` 시트 기반 역할 |
@@ -166,14 +172,16 @@ mb-truck-spec/
 │   │   ├── msal.js            ← Microsoft 365 인증
 │   │   ├── graph.js           ← Microsoft Graph REST 헬퍼
 │   │   ├── workbook.js        ← SharePoint Excel 워크북 액세스
+│   │   ├── sourceFiles.js     ← SharePoint 견적서(.docx) 폴더 탐색
 │   │   ├── codeIndex.js       ← 코드 사전 매칭 유틸
-│   │   ├── parser.js          ← .docx 파싱 (mammoth)
+│   │   ├── parser.js          ← .docx 파싱 (mammoth) + 파일명 기본정보 추출
 │   │   └── export.js          ← 사양 Excel/PDF 내보내기
 │   ├── contexts/
 │   │   └── DataContext.jsx    ← SharePoint 데이터 캐시 + 변경 API
 │   ├── components/
 │   │   ├── ui/                ← Button, Badge, Toggle, LangToggle
-│   │   ├── admin/ExcelImport.jsx  ← SharePoint Excel 열기 + 다시 불러오기 패널
+│   │   ├── admin/ExcelImport.jsx     ← SharePoint Excel 열기 + 다시 불러오기 패널
+│   │   ├── admin/SharePointPicker.jsx ← 견적서 .docx 공유폴더 탐색 모달
 │   │   ├── Layout.jsx, ModelCard.jsx, SpecTable.jsx,
 │   │   ├── CompareTable.jsx, CompareBar.jsx, ColorSwatch.jsx
 │   ├── pages/
@@ -214,10 +222,11 @@ npx vercel deploy --prod --yes   # 운영 배포 → mbtruck-spec.startruckkorea
 VITE_MSAL_CLIENT_ID=...
 VITE_MSAL_TENANT_ID=...
 
-# SharePoint 위치 — 미설정 시 workbook.js 기본값
+# SharePoint 위치 — 미설정 시 workbook.js / sourceFiles.js 기본값
 VITE_SP_HOSTNAME=startruckkorea.sharepoint.com
 VITE_SP_SITE_PATH=/sites/STK-PMM
-VITE_SP_FOLDER_PATH=mbtruck-spec/Code
+VITE_SP_FOLDER_PATH=mbtruck-spec/Code          # 데이터 워크북(.xlsx) 폴더
+VITE_SP_QUOTATION_PATH=mbtruck-spec/Quotation  # 견적서(.docx) 원본 폴더
 
 # 앱 타이틀
 VITE_APP_TITLE=...
@@ -236,6 +245,10 @@ VITE_APP_TITLE=...
 **SharePoint:**
 - 사이트: `https://startruckkorea.sharepoint.com/sites/STK-PMM/`
 - 데이터 워크북 폴더: `Shared Documents/mbtruck-spec/Code/`
+- 견적서(.docx) 원본 폴더: `Shared Documents/mbtruck-spec/Quotation/`
+  - 하위를 MY 연도(`MY26`, `MY27` …) → 생산월(`2026-04` …) 폴더로 구분.
+  - 모델 등록 시 이 폴더를 탐색해 .docx 를 바로 선택한다 (앱이 폴더명 무관하게
+    트리로 탐색하므로 명명 규칙은 자유, 단 `MY##` 폴더명은 Model Year 자동 입력에 쓰임).
 - 앱 사용자는 이 파일 "읽기" 권한, 관리자는 "편집" 권한 필요.
 
 ---
