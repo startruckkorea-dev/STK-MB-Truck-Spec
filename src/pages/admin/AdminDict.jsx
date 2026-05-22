@@ -4,7 +4,6 @@ import Button from '../../components/ui/Button';
 import Toggle from '../../components/ui/Toggle';
 import ExcelImport from '../../components/admin/ExcelImport';
 import { useDict } from '../../hooks/useDict';
-import { supabase } from '../../lib/supabase';
 
 const CATEGORY_OPTIONS = [
   '엔진', '변속기', '차축', '서스펜션', '타이어/휠', '캡', '외장 컬러',

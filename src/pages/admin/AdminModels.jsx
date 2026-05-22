@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
-import { supabase } from '../../lib/supabase';
+import { useData } from '../../contexts/DataContext';
 
 const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego' };
 
@@ -18,10 +18,16 @@ function SortIcon({ col, sortKey, sortDir }) {
 }
 
 export default function AdminModels() {
-  const [models, setModels] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    models: allModels,
+    modelNotes,
+    loading,
+    error,
+    setModelVisible,
+    deleteModel: ctxDeleteModel,
+  } = useData();
   const [deleting, setDeleting] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   // 필터
   const [filterYear, setFilterYear] = useState('');
@@ -32,58 +38,33 @@ export default function AdminModels() {
   const [sortKey, setSortKey] = useState('model_year');
   const [sortDir, setSortDir] = useState('desc');
 
-  useEffect(() => { fetchModels(); }, []);
-
-  async function fetchModels() {
-    setLoading(true);
-    const [
-      { data: modelsData, error: modelsErr },
-      { data: notesData, error: notesErr },
-    ] = await Promise.all([
-      supabase
-        .from('models')
-        .select('*')
-        .order('model_year', { ascending: false })
-        .order('series')
-        .order('code'),
-      supabase
-        .from('model_notes')
-        .select('id, model_id, label, sort_order')
-        .order('sort_order'),
-    ]);
-
-    if (modelsErr || notesErr) {
-      setError((modelsErr || notesErr).message);
-    } else {
-      // notes를 model_id 기준으로 그룹핑해서 model에 붙이기
-      const notesMap = {};
-      (notesData ?? []).forEach((n) => {
-        if (!notesMap[n.model_id]) notesMap[n.model_id] = [];
-        notesMap[n.model_id].push(n);
-      });
-      setModels(
-        (modelsData ?? []).map((m) => ({
-          ...m,
-          model_notes: notesMap[m.id] ?? [],
-        }))
-      );
-    }
-    setLoading(false);
-  }
+  // 캐시의 모델에 노트를 붙임
+  const models = useMemo(() => {
+    const notesMap = {};
+    modelNotes.forEach((n) => {
+      (notesMap[n.model_id] || (notesMap[n.model_id] = [])).push(n);
+    });
+    return allModels.map((m) => ({ ...m, model_notes: notesMap[m.id] ?? [] }));
+  }, [allModels, modelNotes]);
 
   async function toggleVisibility(model) {
-    const { error } = await supabase
-      .from('models')
-      .update({ is_visible: !model.is_visible })
-      .eq('id', model.id);
-    if (!error) fetchModels();
+    setActionError(null);
+    try {
+      await setModelVisible(model.id, !model.is_visible);
+    } catch (e) {
+      setActionError(e.message);
+    }
   }
 
   async function deleteModel(id) {
     if (!window.confirm('이 모델과 모든 사양 데이터를 삭제하시겠습니까?')) return;
+    setActionError(null);
     setDeleting(id);
-    const { error } = await supabase.from('models').delete().eq('id', id);
-    if (!error) fetchModels();
+    try {
+      await ctxDeleteModel(id);
+    } catch (e) {
+      setActionError(e.message);
+    }
     setDeleting(null);
   }
 
@@ -203,9 +184,9 @@ export default function AdminModels() {
       {loading && (
         <div className="text-center py-20 text-gray-400 animate-pulse">로딩 중...</div>
       )}
-      {error && (
+      {(error || actionError) && (
         <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm mb-4">
-          {error}
+          {error || actionError}
         </div>
       )}
 

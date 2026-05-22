@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import SpecTable from '../components/SpecTable';
 import Badge from '../components/ui/Badge';
@@ -7,59 +7,34 @@ import Button from '../components/ui/Button';
 import { useModelDetail } from '../hooks/useModels';
 import { useAuth } from '../hooks/useAuth';
 import { useSpecLang } from '../hooks/useSpecLang';
-import { supabase } from '../lib/supabase';
+import { useData } from '../contexts/DataContext';
 import { exportDetailToExcel, exportDetailToPDF } from '../lib/export';
 
 
 export default function ModelDetail() {
   const { id } = useParams();
   const { isAdmin } = useAuth();
-  const { model, specs: initialSpecs, notes: initialNotes, loading, error } = useModelDetail(id);
+  const { model, specs: initialSpecs, notes, loading, error } = useModelDetail(id);
+  const { codeIndex: dict, setSpecHidden } = useData();
   const [specs, setSpecs] = useState([]);
-  const [notes, setNotes] = useState([]);
-  const [dict, setDict] = useState({});
   const [lang] = useSpecLang();
 
-  // initialSpecs가 로드되면 로컬 상태로 복사
+  // initialSpecs(캐시)가 갱신되면 로컬 상태로 동기화
   useEffect(() => {
     setSpecs(initialSpecs);
   }, [initialSpecs]);
 
-  useEffect(() => {
-    setNotes(initialNotes);
-  }, [initialNotes]);
-
-  // 사용된 코드들 조회 (정규화)
-  const specValues = useMemo(
-    () => [...new Set(specs.filter((s) => s.use_translate).map((s) => (s.spec_value || '').trim().toUpperCase()).filter(Boolean))],
-    [specs]
-  );
-
-  useEffect(() => {
-    if (specValues.length === 0) return;
-    supabase
-      .from('code_dict')
-      .select('code, name_ko, name_en, hex_color, is_hidden, category')
-      .in('code', specValues)
-      .then(({ data }) => {
-        if (data) {
-          const map = {};
-          data.forEach((r) => { map[r.code] = r; });
-          setDict(map);
-        }
-      });
-  }, [specValues.join(',')]);
-
   // 어드민 인라인 숨김 토글 (낙관적 업데이트)
   const toggleSpecHidden = useCallback(async (specId, currentValue) => {
     const newValue = !currentValue;
-    setSpecs((prev) => prev.map((s) => s.id === specId ? { ...s, is_hidden: newValue } : s));
-    const { error } = await supabase.from('specs').update({ is_hidden: newValue }).eq('id', specId);
-    if (error) {
+    setSpecs((prev) => prev.map((s) => (s.id === specId ? { ...s, is_hidden: newValue } : s)));
+    try {
+      await setSpecHidden(specId, newValue);
+    } catch {
       // 실패 시 롤백
-      setSpecs((prev) => prev.map((s) => s.id === specId ? { ...s, is_hidden: currentValue } : s));
+      setSpecs((prev) => prev.map((s) => (s.id === specId ? { ...s, is_hidden: currentValue } : s)));
     }
-  }, []);
+  }, [setSpecHidden]);
 
   if (loading) {
     return (

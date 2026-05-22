@@ -1,40 +1,52 @@
 import { useState, useEffect, createContext, useContext, useMemo } from 'react';
 import { EventType } from '@azure/msal-browser';
-import { supabase } from '../lib/supabase';
 import {
   msalInstance,
   initMsal,
   getMicrosoftAccount,
   signOutMicrosoft,
 } from '../lib/msal';
+import { readSheet } from '../lib/workbook';
 
 const AuthContext = createContext(null);
 
+/**
+ * 인증 = Microsoft 365(MSAL) 전용.
+ * 역할(admin/staff/sales)은 SharePoint 워크북 `users` 시트로 결정한다.
+ * 부트스트랩: 등록된 admin 이 한 명도 없으면 로그인한 사용자를 모두 admin 으로 취급.
+ */
 export function AuthProvider({ children }) {
-  const [supaUser, setSupaUser] = useState(null);
-  const [supaProfile, setSupaProfile] = useState(null);
   const [msAccount, setMsAccount] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [msalReady, setMsalReady] = useState(false);
+  const [role, setRole] = useState(null); // null = 아직 미확정
 
-  // ─── MSAL: 초기화 + 이벤트 구독 ─────────────────────────────────
+  // ─── MSAL 초기화 + 이벤트 구독 ─────────────────────────────────
   useEffect(() => {
     let unsubscribe;
     (async () => {
       await initMsal();
       setMsAccount(getMicrosoftAccount());
+      setMsalReady(true);
       const callbackId = msalInstance.addEventCallback((event) => {
         switch (event.eventType) {
+          // ⚠️ ACQUIRE_TOKEN_SUCCESS 는 처리하지 않는다 — 토큰 획득마다 계정 state 가
+          //    갱신되면 효과 재실행 → 재요청 → 무한 루프가 된다.
           case EventType.LOGIN_SUCCESS:
-          case EventType.ACQUIRE_TOKEN_SUCCESS:
-          case EventType.ACCOUNT_ADDED:
-            if (event.payload?.account) {
-              msalInstance.setActiveAccount(event.payload.account);
-              setMsAccount(event.payload.account);
+          case EventType.ACCOUNT_ADDED: {
+            const acc = event.payload?.account;
+            if (acc) {
+              msalInstance.setActiveAccount(acc);
+              // 같은 계정이면 참조를 유지해 불필요한 재렌더/효과 재실행 방지
+              setMsAccount((prev) =>
+                prev && prev.homeAccountId === acc.homeAccountId ? prev : acc
+              );
             }
             break;
+          }
           case EventType.LOGOUT_SUCCESS:
           case EventType.ACCOUNT_REMOVED:
             setMsAccount(null);
+            setRole(null);
             break;
           default:
             break;
@@ -45,74 +57,51 @@ export function AuthProvider({ children }) {
     return () => unsubscribe && unsubscribe();
   }, []);
 
-  // ─── Supabase: 기존 세션 폴백 (다음 세션에 SharePoint로 대체 예정) ─
+  // ─── 역할 결정: users 시트 조회 ─────────────────────────────────
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 5000);
-
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        clearTimeout(timer);
-        setSupaUser(session?.user ?? null);
-        if (session?.user) fetchProfile(session.user.id);
-        else setLoading(false);
-      })
-      .catch(() => {
-        clearTimeout(timer);
-        setLoading(false);
-      });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSupaUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => fetchProfile(session.user.id), 0);
-        } else {
-          setSupaProfile(null);
-          setLoading(false);
-        }
+    if (!msAccount) { setRole(null); return; }
+    let cancelled = false;
+    (async () => {
+      const email = String(msAccount.username || '').trim().toLowerCase();
+      try {
+        const users = await readSheet('users');
+        if (cancelled) return;
+        const match = users.find(
+          (u) => String(u.email || '').trim().toLowerCase() === email
+        );
+        const hasAdmin = users.some((u) => (u.role || '') === 'admin');
+        if (match) setRole(match.role || 'sales');
+        else if (!hasAdmin) setRole('admin'); // 부트스트랩
+        else setRole('sales');
+      } catch {
+        // users 시트를 못 읽으면 최소 권한(sales)로 — 워크북 오류는 DataContext가 안내
+        if (!cancelled) setRole('sales');
       }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  async function fetchProfile(userId) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (!error) setSupaProfile(data);
-    setLoading(false);
-  }
+    })();
+    return () => { cancelled = true; };
+  }, [msAccount]);
 
   async function signOut() {
-    if (msAccount) {
-      try { await signOutMicrosoft(); } catch (_) { /* 팝업 차단 등 무시 */ }
-    }
-    if (supaUser) {
-      await supabase.auth.signOut();
+    try {
+      await signOutMicrosoft();
+    } catch {
+      /* 팝업 차단 등 무시 */
     }
   }
 
-  // ─── 통합 user / profile (MS 우선) ─────────────────────────────
+  // 로그인 안 했으면 MSAL 준비 후 바로, 로그인 했으면 역할 확정까지 대기
+  const loading = !msalReady || (!!msAccount && role === null);
+
   const { user, profile } = useMemo(() => {
-    if (msAccount) {
-      const unified = {
-        id: msAccount.localAccountId || msAccount.homeAccountId,
-        email: msAccount.username,
-        name: msAccount.name || msAccount.username,
-        provider: 'microsoft',
-      };
-      // 임시: MS-인증 사용자는 모두 admin. 역할 세분화는 SharePoint 연동 단계에서 재설계.
-      return {
-        user: unified,
-        profile: { ...unified, role: 'admin' },
-      };
-    }
-    return { user: supaUser, profile: supaProfile };
-  }, [msAccount, supaUser, supaProfile]);
+    if (!msAccount) return { user: null, profile: null };
+    const u = {
+      id: msAccount.localAccountId || msAccount.homeAccountId,
+      email: msAccount.username,
+      name: msAccount.name || msAccount.username,
+      provider: 'microsoft',
+    };
+    return { user: u, profile: { ...u, role: role || 'sales' } };
+  }, [msAccount, role]);
 
   const isAdmin = profile?.role === 'admin';
   const isStaff = profile?.role === 'staff';

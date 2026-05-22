@@ -3,12 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import Button from '../../components/ui/Button';
 import Toggle from '../../components/ui/Toggle';
-import { parseDocx, parseModelYear } from '../../lib/parser';
-import { supabase } from '../../lib/supabase';
+import { parseDocx } from '../../lib/parser';
+import { useData } from '../../contexts/DataContext';
 
 const SERIES_OPTIONS = ['Actros', 'Arocs', 'Atego'];
-const BADGE_OPTIONS = ['', 'new', 'updated'];
-const BATCH_SIZE = 200;
 
 export default function AdminModelEdit() {
   const { id } = useParams(); // undefined = 신규 등록
@@ -16,6 +14,7 @@ export default function AdminModelEdit() {
   const fileInputRef = useRef(null);
 
   const isEdit = Boolean(id);
+  const { models, specs: cachedSpecs, modelNotes, codeIndex, saveModel } = useData();
 
   // ── 기본 정보 ──
   const [series, setSeries] = useState('Actros');
@@ -44,28 +43,33 @@ export default function AdminModelEdit() {
   // ── 보충 노트 ──
   const [notes, setNotes] = useState([]);
 
-  // ── 기존 모델 로드 ──
+  // ── 기존 모델 로드 (SharePoint 캐시에서, 1회) ──
+  const populatedRef = useRef(false);
   useEffect(() => {
-    if (!isEdit) return;
-    supabase.from('models').select('*').eq('id', id).single().then(({ data, error }) => {
-      if (error || !data) return;
-      setSeries(data.series);
-      setCode(data.code);
-      setAxle(data.axle ?? '');
-      setCabin(data.cabin ?? '');
-      setCodeDesc(data.code_desc ?? '');
-      setNameKo(data.name_ko);
-      setModelYear(data.model_year);
-      setBadge(data.badge ?? '');
-      setIsVisible(data.is_visible);
-    });
-    supabase.from('specs').select('*').eq('model_id', id).order('sort_order').then(({ data }) => {
-      if (data) setParsedSpecs(data);
-    });
-    supabase.from('model_notes').select('*').eq('model_id', id).order('sort_order').then(({ data }) => {
-      if (data) setNotes(data);
-    });
-  }, [id]);
+    if (!isEdit || populatedRef.current) return;
+    const m = models.find((x) => Number(x.id) === Number(id));
+    if (!m) return;
+    populatedRef.current = true;
+    setSeries(m.series);
+    setCode(m.code);
+    setAxle(m.axle ?? '');
+    setCabin(m.cabin ?? '');
+    setCodeDesc(m.code_desc ?? '');
+    setNameKo(m.name_ko);
+    setModelYear(m.model_year);
+    setBadge(m.badge ?? '');
+    setIsVisible(m.is_visible !== false);
+    setParsedSpecs(
+      cachedSpecs
+        .filter((s) => Number(s.model_id) === Number(id))
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    );
+    setNotes(
+      modelNotes
+        .filter((n) => Number(n.model_id) === Number(id))
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    );
+  }, [isEdit, id, models, cachedSpecs, modelNotes]);
 
   // ── .docx 파일 처리 (공통) ──
   async function processFile(file) {
@@ -85,21 +89,11 @@ export default function AdminModelEdit() {
 
       if (detectedYear && !modelYear) setModelYear(detectedYear);
 
-      // code_dict에서 번역 조회 (코드 정규화: trim + uppercase)
+      // 코드 사전(SharePoint 캐시)에서 번역 조회 (코드 정규화: trim + uppercase)
       const codes = [...new Set(specs.map((s) => s.spec_value.trim().toUpperCase()))];
-      console.log('[4] code_dict 조회:', codes.length, '개 코드');
-      console.log('[4-debug] 코드 샘플:', codes.slice(0, 10));
-      const { data: dictRows } = await supabase
-        .from('code_dict')
-        .select('code, name_ko, category, hex_color, is_hidden')
-        .in('code', codes);
       const map = {};
-      (dictRows || []).forEach((d) => { map[d.code] = d; });
-      console.log('[5] code_dict 매핑 완료:', Object.keys(map).length, '/', codes.length, '개 매칭');
-      if (codes.length > Object.keys(map).length) {
-        const unmatched = codes.filter(c => !map[c]);
-        console.warn('[5-debug] 미매칭 코드:', unmatched.slice(0, 10));
-      }
+      codes.forEach((c) => { if (codeIndex[c]) map[c] = codeIndex[c]; });
+      console.log('[parse] 사양', specs.length, '개, 번역 매칭', Object.keys(map).length, '/', codes.length);
 
       setParsedSpecs(specs);
       setDictMap(map);
@@ -168,23 +162,21 @@ export default function AdminModelEdit() {
     setWarnMsg('');
 
     try {
-      console.log('[Save-1] 저장 시작');
-      let modelId = id ? Number(id) : null;
+      const modelCode = code.trim().toUpperCase();
+      const modelAxle = axle.trim();
+      const modelCabin = cabin.trim().toUpperCase();
 
-      // ── 신규 등록 시 중복 사전 체크 ──
+      // ── 신규 등록 시 중복 체크 ──
       if (!isEdit) {
-        const { data: existing } = await supabase
-          .from('models')
-          .select('id')
-          .eq('code', code.trim().toUpperCase())
-          .eq('model_year', modelYear)
-          .eq('axle', axle.trim())
-          .eq('cabin', cabin.trim().toUpperCase())
-          .limit(1);
-
-        if (existing && existing.length > 0) {
+        const dup = models.find(
+          (m) =>
+            String(m.code || '').trim().toUpperCase() === modelCode &&
+            String(m.model_year || '') === modelYear &&
+            String(m.axle || '').trim() === modelAxle &&
+            String(m.cabin || '').trim().toUpperCase() === modelCabin
+        );
+        if (dup) {
           if (!codeDesc?.trim()) {
-            // 기타특징 없음 → 등록 불가
             setErrorMsg(
               '같은 모델 코드 + 축 + 캐빈 + Model Year 조합이 이미 등록되어 있습니다.\n기존 모델을 편집하거나, 기타특징(예: 챔피언스 에디션)을 입력하면 별도 모델로 등록할 수 있습니다.'
             );
@@ -192,7 +184,6 @@ export default function AdminModelEdit() {
             return;
           }
           if (!duplicateWarned) {
-            // 기타특징 있음 → 경고 1회 표시 후 재클릭 시 진행
             setDuplicateWarned(true);
             setWarnMsg(
               '⚠️ 동일한 코드 조합이 이미 존재합니다. 기타특징이 입력되어 있으므로 별도 모델로 등록할 수 있습니다.\n계속 등록하려면 [모델 등록] 버튼을 다시 클릭하세요.'
@@ -200,50 +191,29 @@ export default function AdminModelEdit() {
             setSaving(false);
             return;
           }
-          // duplicateWarned = true → 경고 확인됨, 계속 진행
         }
       }
 
-      // models 테이블 upsert
-      const modelPayload = {
+      // 모델 데이터
+      const modelObj = {
         series,
-        code: code.trim().toUpperCase(),
-        axle: axle.trim(),
-        cabin: cabin.trim().toUpperCase(),
+        code: modelCode,
+        axle: modelAxle,
+        cabin: modelCabin,
         code_desc: codeDesc || null,
         name_ko: nameKo,
         model_year: modelYear,
         badge: badge || null,
         is_visible: isVisible,
       };
+      if (isEdit) modelObj.id = Number(id);
 
-      if (isEdit) {
-        const { error } = await supabase.from('models').update(modelPayload).eq('id', modelId);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.from('models').insert(modelPayload).select('id').single();
-        if (error) throw error;
-        modelId = data.id;
-      }
-      console.log('[Save] models 저장 완료, modelId:', modelId);
-
-      // specs 저장
+      // 사양 (spec_key 중복 제거, 마지막 값 우선)
+      let specsList = [];
       if (parsedSpecs && parsedSpecs.length > 0) {
-        console.log('[Save-4] specs 저장 시작:', parsedSpecs.length, '개');
-        // 기존 사양 삭제 후 재삽입
-        if (isEdit) {
-          const { error } = await supabase.from('specs').delete().eq('model_id', modelId);
-          if (error) throw error;
-          console.log('[Save-5] 기존 specs 삭제 완료');
-        }
-
-        // spec_key 중복 제거 (마지막 값 우선)
         const deduped = new Map();
-        parsedSpecs.forEach((s, idx) => {
-          deduped.set(s.spec_key, { ...s, _idx: idx });
-        });
-        const specsPayload = [...deduped.values()].map((s, idx) => ({
-          model_id: modelId,
+        parsedSpecs.forEach((s, idx) => deduped.set(s.spec_key, { ...s, _idx: idx }));
+        specsList = [...deduped.values()].map((s, idx) => ({
           category: s.category,
           spec_key: s.spec_key?.trim().toUpperCase() || s.spec_key,
           spec_value: s.spec_value?.trim().toUpperCase() || s.spec_value,
@@ -251,48 +221,24 @@ export default function AdminModelEdit() {
           use_translate: s.use_translate ?? true,
           is_color: s.is_color ?? false,
           is_hidden: s.is_hidden ?? false,
-          sort_order: s.sort_order ?? s._idx,
+          sort_order: s.sort_order ?? s._idx ?? idx,
         }));
-
-        for (let i = 0; i < specsPayload.length; i += BATCH_SIZE) {
-          const batch = specsPayload.slice(i, i + BATCH_SIZE);
-          console.log('[Save-6] specs 배치 저장:', i, '~', Math.min(i + BATCH_SIZE, specsPayload.length));
-          const { error } = await supabase.from('specs').insert(batch);
-          if (error) throw error;
-        }
-        console.log('[Save-7] specs 저장 완료');
       }
 
-      // 보충 노트 저장 (기존 삭제 후 재삽입)
-      const validNotes = notes.filter((n) => n.label.trim() && n.content.trim());
-      await supabase.from('model_notes').delete().eq('model_id', modelId);
-      if (validNotes.length > 0) {
-        const notesPayload = validNotes.map((n, idx) => ({
-          model_id: modelId,
+      // 보충 노트 (항목명+내용 모두 입력된 것만)
+      const notesList = notes
+        .filter((n) => n.label.trim() && n.content.trim())
+        .map((n, idx) => ({
           label: n.label.trim(),
           content: n.content.trim(),
           sort_order: idx,
         }));
-        const { error } = await supabase.from('model_notes').insert(notesPayload);
-        if (error) throw error;
-      }
-      console.log('[Save-8] 노트 저장 완료');
 
-      console.log('[Save-9] 저장 완료, 리다이렉트');
+      await saveModel(modelObj, specsList, notesList);
       navigate('/admin/models');
     } catch (err) {
-      console.error('[Save-Error]', err);
-      if (
-        err.message?.includes('models_code_axle_cabin_year_desc_key') ||
-        err.message?.includes('models_code_axle_cabin_year_key') ||
-        err.message?.includes('models_code_model_year_key')
-      ) {
-        setErrorMsg(
-          '같은 모델 코드 + 축 + 캐빈 + Model Year + 기타특징 조합이 이미 등록되어 있습니다.\n기존 모델을 편집하거나 기타특징 값을 변경해주세요.'
-        );
-      } else {
-        setErrorMsg(err.message);
-      }
+      console.error('[모델 저장 실패]', err);
+      setErrorMsg(err.message);
     }
     setSaving(false);
   }

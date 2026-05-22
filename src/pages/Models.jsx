@@ -31,7 +31,7 @@ function sortBodyTypes(types) {
 }
 
 export default function Models() {
-  const { models, loading, error, refetch } = useModels();
+  const { models, loading, error } = useModels();
 
   const [activeSeries, setActiveSeries] = useState('전체');
   const [selectedYear, setSelectedYear] = useState('');
@@ -196,7 +196,6 @@ export default function Models() {
                           model={model}
                           isSelected={compareList.some((m) => m.id === model.id)}
                           onCompareToggle={toggleCompare}
-                          onVisibilityChange={refetch}
                         />
                       ))}
                     </div>

@@ -1,96 +1,43 @@
 import { useSearchParams, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import Layout from '../components/Layout';
 import CompareTable from '../components/CompareTable';
 import Button from '../components/ui/Button';
 import { useSpecLang } from '../hooks/useSpecLang';
-import { supabase } from '../lib/supabase';
+import { useData } from '../contexts/DataContext';
 import { exportCompareToExcel, exportCompareToPDF } from '../lib/export';
 
 export default function Compare() {
   const [searchParams] = useSearchParams();
-  const ids = (searchParams.get('ids') ?? '').split(',').filter(Boolean).map(Number);
+  const idsKey = (searchParams.get('ids') ?? '').split(',').filter(Boolean).join(',');
+  const idCount = idsKey ? idsKey.split(',').length : 0;
 
-  const [models, setModels] = useState([]);
-  const [specsMap, setSpecsMap] = useState({});
-  const [notesMap, setNotesMap] = useState({});
-  const [dict, setDict] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { models: allModels, specs: allSpecs, modelNotes, codeIndex, loading, error } = useData();
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [lang] = useSpecLang();
 
-  useEffect(() => {
-    if (ids.length < 2) { setLoading(false); return; }
-    fetchData(ids);
-  }, [ids.join(',')]);
+  // 캐시에서 선택 모델 + 사양 + 노트 구성 (id 순서 유지)
+  const { models, specsMap, notesMap } = useMemo(() => {
+    const idList = idsKey.split(',').filter(Boolean).map(Number);
+    const ms = idList
+      .map((id) => allModels.find((m) => Number(m.id) === id))
+      .filter(Boolean);
+    const sm = {};
+    const nm = {};
+    ms.forEach((m) => {
+      sm[m.id] = allSpecs
+        .filter((s) => Number(s.model_id) === Number(m.id))
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      nm[m.id] = modelNotes
+        .filter((n) => Number(n.model_id) === Number(m.id))
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    });
+    return { models: ms, specsMap: sm, notesMap: nm };
+  }, [idsKey, allModels, allSpecs, modelNotes]);
 
-  async function fetchData(modelIds) {
-    setLoading(true);
-    try {
-      // 모델 조회
-      const { data: modelsData, error: mErr } = await supabase
-        .from('models')
-        .select('*')
-        .in('id', modelIds);
-      if (mErr) throw mErr;
+  const dict = codeIndex;
 
-      // id 순서 유지
-      const orderedModels = modelIds
-        .map((id) => modelsData.find((m) => m.id === id))
-        .filter(Boolean);
-
-      // 사양 + 노트 조회 (병렬)
-      const [
-        { data: specsData, error: sErr },
-        { data: notesData, error: nErr },
-      ] = await Promise.all([
-        supabase.from('specs').select('*').in('model_id', modelIds).order('sort_order'),
-        supabase.from('model_notes').select('*').in('model_id', modelIds).order('sort_order'),
-      ]);
-      if (sErr) throw sErr;
-      if (nErr) throw nErr;
-
-      // 사양 맵 구성
-      const sm = {};
-      specsData.forEach((spec) => {
-        if (!sm[spec.model_id]) sm[spec.model_id] = [];
-        sm[spec.model_id].push(spec);
-      });
-
-      // 노트 맵 구성
-      const nm = {};
-      (notesData ?? []).forEach((note) => {
-        if (!nm[note.model_id]) nm[note.model_id] = [];
-        nm[note.model_id].push(note);
-      });
-
-      // 코드 사전 조회 (정규화)
-      const allCodes = [...new Set(
-        specsData.filter((s) => s.use_translate).map((s) => (s.spec_value || '').trim().toUpperCase()).filter(Boolean)
-      )];
-      let dictData = {};
-      if (allCodes.length > 0) {
-        const { data: dData } = await supabase
-          .from('code_dict')
-          .select('code, name_ko, name_en, hex_color, is_hidden, category')
-          .in('code', allCodes);
-        if (dData) {
-          dData.forEach((r) => { dictData[r.code] = r; });
-        }
-      }
-
-      setModels(orderedModels);
-      setSpecsMap(sm);
-      setNotesMap(nm);
-      setDict(dictData);
-    } catch (err) {
-      setError(err.message);
-    }
-    setLoading(false);
-  }
-
-  if (ids.length < 2) {
+  if (idCount < 2) {
     return (
       <Layout>
         <div className="text-center py-20">

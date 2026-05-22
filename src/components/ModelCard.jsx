@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabase';
+import { useData } from '../contexts/DataContext';
 
 function getYearVariant(modelYear) {
   const n = parseInt(String(modelYear).replace(/\D/g, '')) || 0;
@@ -19,16 +19,16 @@ export default function ModelCard({
   model,
   isSelected,
   onCompareToggle,
-  onVisibilityChange,
 }) {
   const { isAdmin } = useAuth();
+  const { setModelVisible } = useData();
 
   async function toggleVisibility() {
-    const { error } = await supabase
-      .from('models')
-      .update({ is_visible: !model.is_visible })
-      .eq('id', model.id);
-    if (!error) onVisibilityChange?.();
+    try {
+      await setModelVisible(model.id, !model.is_visible);
+    } catch (e) {
+      alert(e.message);
+    }
   }
 
   const isHidden = !model.is_visible;

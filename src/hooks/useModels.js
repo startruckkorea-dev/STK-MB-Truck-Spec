@@ -1,104 +1,57 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useMemo } from 'react';
+import { useData } from '../contexts/DataContext';
+import { useAuth } from './useAuth';
 
 /**
- * 모델 목록 조회
+ * 모델 목록 조회 (SharePoint 캐시 기반)
  * - admin: is_visible=false 포함 전체
- * - sales: is_visible=true만 (RLS가 처리)
+ * - sales/staff: is_visible=true 만
  */
 export function useModels() {
-  const [models, setModels] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { models, loading, error, reload } = useData();
+  const { isAdmin } = useAuth();
 
-  useEffect(() => {
-    fetchModels();
-  }, []);
+  const sorted = useMemo(() => {
+    const list = isAdmin ? models : models.filter((m) => m.is_visible !== false);
+    return [...list].sort((a, b) => {
+      const y = String(b.model_year || '').localeCompare(String(a.model_year || ''));
+      if (y !== 0) return y;
+      const s = String(a.series || '').localeCompare(String(b.series || ''));
+      if (s !== 0) return s;
+      return String(a.code || '').localeCompare(String(b.code || ''));
+    });
+  }, [models, isAdmin]);
 
-  async function fetchModels() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('models')
-      .select('*')
-      .order('model_year', { ascending: false })
-      .order('series')
-      .order('code');
-
-    if (error) setError(error.message);
-    else setModels(data ?? []);
-    setLoading(false);
-  }
-
-  return { models, loading, error, refetch: fetchModels };
+  return { models: sorted, loading, error, refetch: reload };
 }
 
 /**
- * 단일 모델 + 사양 + 보충 노트 조회
+ * 단일 모델 + 사양 + 보충 노트 조회 (SharePoint 캐시 기반)
  */
 export function useModelDetail(id) {
-  const [model, setModel] = useState(null);
-  const [specs, setSpecs] = useState([]);
-  const [notes, setNotes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { models, specs, modelNotes, loading, error } = useData();
+  const modelId = Number(id);
 
-  useEffect(() => {
-    if (!id) return;
-    fetchModelDetail(id);
-  }, [id]);
+  const model = useMemo(
+    () => models.find((m) => Number(m.id) === modelId) || null,
+    [models, modelId]
+  );
 
-  async function fetchModelDetail(modelId) {
-    setLoading(true);
+  const modelSpecs = useMemo(
+    () =>
+      specs
+        .filter((s) => Number(s.model_id) === modelId)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    [specs, modelId]
+  );
 
-    const [
-      { data: modelData, error: modelErr },
-      { data: specsData, error: specsErr },
-      { data: notesData, error: notesErr },
-    ] = await Promise.all([
-      supabase.from('models').select('*').eq('id', modelId).single(),
-      supabase.from('specs').select('*').eq('model_id', modelId).order('sort_order'),
-      supabase.from('model_notes').select('*').eq('model_id', modelId).order('sort_order'),
-    ]);
+  const notes = useMemo(
+    () =>
+      modelNotes
+        .filter((n) => Number(n.model_id) === modelId)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    [modelNotes, modelId]
+  );
 
-    if (modelErr || specsErr || notesErr) {
-      setError((modelErr || specsErr || notesErr).message);
-    } else {
-      setModel(modelData);
-      setSpecs(specsData ?? []);
-      setNotes(notesData ?? []);
-    }
-    setLoading(false);
-  }
-
-  return { model, specs, notes, loading, error };
-}
-
-/**
- * 코드 사전 일괄 조회 (번역 매핑용)
- */
-export function useCodeDict(codes) {
-  const [dict, setDict] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!codes || codes.length === 0) return;
-    fetchDict(codes);
-  }, [codes?.join(',')]);
-
-  async function fetchDict(codeList) {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('code_dict')
-      .select('code, name_ko, hex_color, is_hidden, category')
-      .in('code', codeList);
-
-    if (!error && data) {
-      const map = {};
-      data.forEach((row) => { map[row.code] = row; });
-      setDict(map);
-    }
-    setLoading(false);
-  }
-
-  return { dict, loading };
+  return { model, specs: modelSpecs, notes, loading, error };
 }

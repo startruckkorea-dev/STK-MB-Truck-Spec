@@ -1,149 +1,117 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useMemo } from 'react';
+import { useData } from '../contexts/DataContext';
+import { rowMbCode, normCode, isShortCode } from '../lib/codeIndex';
 
 const PAGE_SIZE = 50;
 
+/**
+ * 코드 번역 사전 (SharePoint 캐시 기반)
+ * 반환 시그니처는 기존 Supabase 버전과 동일 — AdminDict.jsx 무수정 유지.
+ */
 export function useDict() {
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    codeDict, specs, codeIndex, loading, error, reload,
+    upsertCode, deleteCode, setCodeHidden,
+  } = useData();
+
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterHidden, setFilterHidden] = useState('all'); // 'all' | 'shown' | 'hidden'
   const [mode, setMode] = useState('all'); // 'all' | 'updated'
-  // 모델에서 사용 중이지만 code_dict에 미등록된 코드
-  const [unregisteredCodes, setUnregisteredCodes] = useState([]);
 
-  useEffect(() => {
-    fetchItems();
-  }, [page, search, filterCategory, filterHidden, mode]);
+  // 모델 사양에서 실제 사용된 코드 (use_translate=true, 정규화)
+  const usedSpecCodes = useMemo(
+    () => [
+      ...new Set(
+        specs
+          .filter((s) => s.use_translate && s.spec_value)
+          .map((s) => normCode(s.spec_value))
+          .filter(Boolean)
+      ),
+    ],
+    [specs]
+  );
 
-  async function fetchItems() {
-    setLoading(true);
-    setUnregisteredCodes([]);
+  // 검색/필터/모드 적용
+  const { filtered, unregisteredCodes } = useMemo(() => {
+    let base = codeDict;
+    let unregistered = [];
 
-    let query = supabase.from('code_dict').select('*', { count: 'exact' });
-
-    // 모델 사용 코드 탭: specs 테이블에서 실제 사용된 코드 기준
     if (mode === 'updated') {
-      const { data: specData } = await supabase
-        .from('specs')
-        .select('spec_value')
-        .eq('use_translate', true)
-        .not('spec_value', 'is', null);
-
-      const allSpecCodes = [...new Set((specData || []).map((r) => r.spec_value))];
-
-      if (allSpecCodes.length === 0) {
-        setItems([]);
-        setTotal(0);
-        setLoading(false);
-        return;
-      }
-
-      // code_dict에 등록된 코드 확인
-      const { data: dictCodes } = await supabase
-        .from('code_dict')
-        .select('code')
-        .in('code', allSpecCodes);
-
-      const registeredSet = new Set((dictCodes || []).map((d) => d.code));
-
-      // 미등록 코드 (검색어 적용)
-      let unregistered = allSpecCodes
-        .filter((c) => !registeredSet.has(c))
-        .sort();
-      if (search) {
-        unregistered = unregistered.filter((c) =>
-          c.toLowerCase().includes(search.toLowerCase())
-        );
-      }
-      setUnregisteredCodes(unregistered);
-
-      query = query.in('code', allSpecCodes);
+      const usedSet = new Set(usedSpecCodes);
+      base = base.filter((r) => usedSet.has(rowMbCode(r)));
+      unregistered = usedSpecCodes.filter((c) => !codeIndex[c]).sort();
     }
 
-    if (search) {
-      query = query.or(`code.ilike.%${search}%,name_ko.ilike.%${search}%,name_en.ilike.%${search}%`);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      base = base.filter(
+        (r) =>
+          String(r.code || '').toLowerCase().includes(q) ||
+          String(r.name_ko || '').toLowerCase().includes(q) ||
+          String(r.name_en || '').toLowerCase().includes(q)
+      );
+      unregistered = unregistered.filter((c) => c.toLowerCase().includes(q));
     }
     if (filterCategory) {
-      query = query.eq('category', filterCategory);
+      base = base.filter((r) => r.category === filterCategory);
     }
-    if (filterHidden === 'shown') {
-      query = query.eq('is_hidden', false);
-    } else if (filterHidden === 'hidden') {
-      query = query.eq('is_hidden', true);
-    }
+    if (filterHidden === 'shown') base = base.filter((r) => !r.is_hidden);
+    else if (filterHidden === 'hidden') base = base.filter((r) => r.is_hidden);
 
-    const from = page * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-    query = query
-      .range(from, to)
-      .order('category', { ascending: true, nullsFirst: false })
-      .order('code', { ascending: true });
+    // 정렬: 카테고리 asc(빈 값 마지막), code asc
+    const sorted = [...base].sort((a, b) => {
+      const ca = a.category || '';
+      const cb = b.category || '';
+      if (ca !== cb) {
+        if (!ca) return 1;
+        if (!cb) return -1;
+        return ca.localeCompare(cb);
+      }
+      return String(a.code || '').localeCompare(String(b.code || ''));
+    });
 
-    const { data, error, count } = await query;
+    return { filtered: sorted, unregisteredCodes: unregistered };
+  }, [codeDict, usedSpecCodes, codeIndex, mode, search, filterCategory, filterHidden]);
 
-    if (error) setError(error.message);
-    else {
-      setItems(data ?? []);
-      setTotal(count ?? 0);
-    }
-    setLoading(false);
-  }
-
-  async function upsertItem(item) {
-    const { error } = await supabase
-      .from('code_dict')
-      .upsert({ ...item, updated_at: new Date().toISOString() }, { onConflict: 'code' });
-    if (error) throw error;
-    await fetchItems();
-  }
-
-  async function deleteItem(id) {
-    const { error } = await supabase.from('code_dict').delete().eq('id', id);
-    if (error) throw error;
-    await fetchItems();
-  }
-
-  async function toggleHidden(id, currentValue) {
-    const { error } = await supabase
-      .from('code_dict')
-      .update({ is_hidden: !currentValue, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) throw error;
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, is_hidden: !currentValue } : i)));
-  }
-
-  // 카테고리 목록 조회 (필터용)
-  const [categories, setCategories] = useState([]);
-  useEffect(() => {
-    supabase
-      .from('code_dict')
-      .select('category')
-      .not('category', 'is', null)
-      .then(({ data }) => {
-        if (data) {
-          const cats = [...new Set(data.map((r) => r.category).filter(Boolean))].sort();
-          setCategories(cats);
-        }
-      });
-  }, []);
-
+  const total = filtered.length;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const items = useMemo(
+    () => filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE),
+    [filtered, page]
+  );
+
+  // 카테고리 목록 (MB 코드 형태는 제외, 실제 카테고리명만)
+  const categories = useMemo(() => {
+    const set = new Set();
+    for (const r of codeDict) {
+      if (r.category && !isShortCode(r.category)) set.add(r.category);
+    }
+    return [...set].sort();
+  }, [codeDict]);
 
   return {
-    items, total, totalPages, loading, error,
-    page, setPage,
-    search, setSearch,
-    filterCategory, setFilterCategory,
-    filterHidden, setFilterHidden,
-    mode, setMode,
+    items,
+    total,
+    totalPages,
+    loading,
+    error,
+    page,
+    setPage,
+    search,
+    setSearch,
+    filterCategory,
+    setFilterCategory,
+    filterHidden,
+    setFilterHidden,
+    mode,
+    setMode,
     categories,
     unregisteredCodes,
-    upsertItem, deleteItem, toggleHidden,
-    refetch: fetchItems,
+    upsertItem: (item) => upsertCode(item),
+    deleteItem: (id) => deleteCode(id),
+    toggleHidden: (id, currentValue) => setCodeHidden(id, !currentValue),
+    refetch: reload,
   };
 }
