@@ -36,12 +36,34 @@ export const msalInstance = new PublicClientApplication(msalConfig);
 
 let initialized = false;
 
+// 이전 로그인이 중도 종료(팝업 닫힘·새로고침·탭 경합 등)되면 localStorage 에
+// `msal.interaction.status` 같은 상태가 남는다. 그 상태에서 새 로그인을 시도하면
+// hash_empty_error / interaction_in_progress / no_token_request_cache_error 등이
+// 발생한다. 이런 stale 오류는 모두 캐시 정리 후 재시도하면 정상 복구된다.
+const STALE_AUTH_ERRORS = new Set([
+  'hash_empty_error',
+  'interaction_in_progress',
+  'no_token_request_cache_error',
+  'no_cached_authority_error',
+]);
+
+function isStaleAuthError(err) {
+  return !!err && STALE_AUTH_ERRORS.has(err.errorCode);
+}
+
 /** MSAL 인스턴스 초기화 (v3는 사용 전 initialize() 필수) */
 export async function initMsal() {
   if (initialized) return;
   await msalInstance.initialize();
-  // 리다이렉트 로그인 사용 시 콜백 처리(팝업만 쓰면 no-op)
-  await msalInstance.handleRedirectPromise();
+  // 리다이렉트 콜백 처리. 팝업 전용 흐름에서는 보통 no-op 이지만, stale 상태로
+  // hash_empty_error 등이 던져질 수 있어 무시한다 — 인스턴스 자체는 정상 사용 가능.
+  try {
+    await msalInstance.handleRedirectPromise();
+  } catch (err) {
+    if (!isStaleAuthError(err)) {
+      console.warn('[msal] handleRedirectPromise:', err?.errorCode || err?.message);
+    }
+  }
   const accounts = msalInstance.getAllAccounts();
   if (accounts.length > 0) {
     msalInstance.setActiveAccount(accounts[0]);
@@ -52,9 +74,23 @@ export async function initMsal() {
 /** Microsoft 365 계정으로 로그인 (팝업). 성공 시 account 반환 */
 export async function signInWithMicrosoft() {
   await initMsal();
-  const result = await msalInstance.loginPopup(loginRequest);
-  msalInstance.setActiveAccount(result.account);
-  return result.account;
+  try {
+    const result = await msalInstance.loginPopup(loginRequest);
+    msalInstance.setActiveAccount(result.account);
+    return result.account;
+  } catch (err) {
+    // stale 인증 상태가 남아 있을 때만 캐시 정리 후 1회 재시도
+    if (!isStaleAuthError(err)) throw err;
+    console.warn('[msal] stale 인증 상태 감지 → 캐시 정리 후 재시도:', err.errorCode);
+    try {
+      await msalInstance.clearCache();
+    } catch {
+      /* clearCache 실패는 무시 */
+    }
+    const result = await msalInstance.loginPopup(loginRequest);
+    msalInstance.setActiveAccount(result.account);
+    return result.account;
+  }
 }
 
 /** Microsoft 365 로그아웃 */
