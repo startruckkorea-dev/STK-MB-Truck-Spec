@@ -26,6 +26,7 @@ export default function AdminModelEdit() {
   const [codeDesc, setCodeDesc] = useState('');
   const [nameKo, setNameKo] = useState('');
   const [modelYear, setModelYear] = useState('');
+  const [productionMonth, setProductionMonth] = useState('');
   const [badge, setBadge] = useState('');
   const [isVisible, setIsVisible] = useState(true);
 
@@ -60,6 +61,7 @@ export default function AdminModelEdit() {
     setCodeDesc(m.code_desc ?? '');
     setNameKo(m.name_ko);
     setModelYear(m.model_year);
+    setProductionMonth(m.production_month ?? '');
     setBadge(m.badge ?? '');
     setIsVisible(m.is_visible !== false);
     setParsedSpecs(
@@ -96,15 +98,17 @@ export default function AdminModelEdit() {
         if (info.code) setCode(info.code);
         if (info.axle) setAxle(info.axle);
         if (info.cabin) setCabin(info.cabin);
-        // 폴더 경로의 "MY##" 세그먼트 → Model Year
-        const myFolder = String(folderPath || '')
+        // 폴더 경로 세그먼트 → Model Year("MY##") / 생산월("YYYY-MM")
+        const segments = String(folderPath || '')
           .split('/')
-          .map((s) => s.trim())
-          .find((s) => /^MY\d{2}$/i.test(s));
+          .map((s) => s.trim());
+        const myFolder = segments.find((s) => /^MY\d{2}$/i.test(s));
         if (myFolder) {
           setModelYear(myFolder.toUpperCase());
           yearAlreadySet = myFolder.toUpperCase();
         }
+        const monthFolder = segments.find((s) => /^\d{4}-\d{2}$/.test(s));
+        if (monthFolder) setProductionMonth(monthFolder);
       }
       // 폴더에서 못 얻었으면 .docx 내용에서 감지한 연도 사용
       if (detectedYear && !yearAlreadySet) setModelYear(detectedYear);
@@ -248,6 +252,7 @@ export default function AdminModelEdit() {
         code_desc: codeDesc || null,
         name_ko: nameKo,
         model_year: modelYear,
+        production_month: productionMonth?.trim() || null,
         badge: badge || null,
         is_visible: isVisible,
       };
@@ -362,6 +367,9 @@ export default function AdminModelEdit() {
                 <p className="text-xs text-gray-400 mb-0.5">표시 이름 미리보기</p>
                 <p className="text-sm font-bold text-gray-800 font-mono">
                   {series} {code}{axle ? ` ${axle}` : ''}{cabin ? ` ${cabin}` : ''}
+                  {productionMonth && (
+                    <span className="ml-1.5 text-xs font-normal text-gray-400">({productionMonth})</span>
+                  )}
                 </p>
               </div>
             )}
@@ -386,16 +394,27 @@ export default function AdminModelEdit() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Model Year *</label>
-              <input
-                value={modelYear}
-                onChange={(e) => setModelYear(e.target.value)}
-                placeholder="예: MY26"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-mb-blue"
-              />
-              <p className="text-xs text-gray-400 mt-1">.docx 파일 업로드 시 자동 유추됩니다.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Model Year *</label>
+                <input
+                  value={modelYear}
+                  onChange={(e) => setModelYear(e.target.value)}
+                  placeholder="예: MY26"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-mb-blue"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">생산월</label>
+                <input
+                  value={productionMonth}
+                  onChange={(e) => setProductionMonth(e.target.value)}
+                  placeholder="예: 2026-04"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-mb-blue"
+                />
+              </div>
             </div>
+            <p className="text-xs text-gray-400 -mt-2">SharePoint 견적서 선택 시 폴더 경로(`MY##`, `YYYY-MM`)에서 자동 유추됩니다.</p>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">상태 배지</label>

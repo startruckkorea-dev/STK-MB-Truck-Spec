@@ -41,6 +41,11 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
                   </div>
                   <span className="font-bold text-gray-900 text-xs sm:text-sm leading-tight">
                     {m.series} {m.code}{m.axle ? ` ${m.axle}` : ''}{m.cabin ? ` ${m.cabin}` : ''}
+                    {m.production_month && (
+                      <span className="ml-1 text-[10px] font-normal text-gray-400 align-middle">
+                        ({m.production_month})
+                      </span>
+                    )}
                   </span>
                 </div>
               </th>

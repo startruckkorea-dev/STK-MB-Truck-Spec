@@ -253,6 +253,9 @@ export default function AdminModels() {
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         <span className="font-mono text-xs text-mb-blue font-semibold">{model.model_year}</span>
+                        {model.production_month && (
+                          <div className="font-mono text-[10px] text-gray-400 mt-0.5">{model.production_month}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -338,6 +341,9 @@ export default function AdminModels() {
                       <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                         <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>{model.series}</Badge>
                         <span className="font-mono text-xs text-mb-blue font-semibold">{model.model_year}</span>
+                        {model.production_month && (
+                          <span className="font-mono text-[10px] text-gray-400">{model.production_month}</span>
+                        )}
                         <span
                           className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
                             model.is_visible ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'

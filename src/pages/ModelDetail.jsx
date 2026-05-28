@@ -90,6 +90,11 @@ export default function ModelDetail() {
             </div>
             <h1 className="font-noto font-bold text-lg sm:text-2xl text-gray-900 mb-0.5 sm:mb-1">
               {model.series} {model.code}{model.axle ? ` ${model.axle}` : ''}{model.cabin ? ` ${model.cabin}` : ''}
+              {model.production_month && (
+                <span className="ml-2 text-xs sm:text-sm font-normal text-gray-400 align-middle">
+                  ({model.production_month})
+                </span>
+              )}
             </h1>
             {model.code_desc && (
               <p className="text-xs sm:text-sm text-gray-400 mt-1">{model.code_desc}</p>

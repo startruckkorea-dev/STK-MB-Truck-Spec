@@ -25,7 +25,7 @@ export const SHEETS = {
     types: { id: 'num', is_hidden: 'bool' },
   },
   models: {
-    columns: ['id', 'series', 'code', 'axle', 'cabin', 'code_desc', 'name_ko', 'model_year', 'badge', 'is_visible'],
+    columns: ['id', 'series', 'code', 'axle', 'cabin', 'code_desc', 'name_ko', 'model_year', 'production_month', 'badge', 'is_visible'],
     types: { id: 'num', is_visible: 'bool' },
   },
   specs: {
