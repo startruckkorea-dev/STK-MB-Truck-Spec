@@ -40,8 +40,6 @@ export default function AdminModelEdit() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false); // SharePoint 선택 모달
   const [errorMsg, setErrorMsg] = useState('');
-  const [warnMsg, setWarnMsg] = useState('');      // 중복 경고 (1회)
-  const [duplicateWarned, setDuplicateWarned] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // ── 보충 노트 ──
@@ -208,7 +206,6 @@ export default function AdminModelEdit() {
     }
     setSaving(true);
     setErrorMsg('');
-    setWarnMsg('');
 
     try {
       const modelCode = code.trim().toUpperCase();
@@ -224,22 +221,13 @@ export default function AdminModelEdit() {
             String(m.axle || '').trim() === modelAxle &&
             String(m.cabin || '').trim().toUpperCase() === modelCabin
         );
-        if (dup) {
-          if (!codeDesc?.trim()) {
-            setErrorMsg(
-              '같은 모델 코드 + 축 + 캐빈 + Model Year 조합이 이미 등록되어 있습니다.\n기존 모델을 편집하거나, 기타특징(예: 챔피언스 에디션)을 입력하면 별도 모델로 등록할 수 있습니다.'
-            );
-            setSaving(false);
-            return;
-          }
-          if (!duplicateWarned) {
-            setDuplicateWarned(true);
-            setWarnMsg(
-              '⚠️ 동일한 코드 조합이 이미 존재합니다. 기타특징이 입력되어 있으므로 별도 모델로 등록할 수 있습니다.\n계속 등록하려면 [모델 등록] 버튼을 다시 클릭하세요.'
-            );
-            setSaving(false);
-            return;
-          }
+        if (dup && !codeDesc?.trim()) {
+          // 동일 조합 + 기타특징 없음 → 등록 차단. 기타특징이 있으면 별도 모델로 바로 저장.
+          setErrorMsg(
+            '같은 모델 코드 + 축 + 캐빈 + Model Year 조합이 이미 등록되어 있습니다.\n기존 모델을 편집하거나, 기타특징(예: 챔피언스 에디션)을 입력하면 별도 모델로 등록할 수 있습니다.'
+          );
+          setSaving(false);
+          return;
         }
       }
 
@@ -575,11 +563,6 @@ export default function AdminModelEdit() {
           </div>
 
           {/* 저장 버튼 */}
-          {warnMsg && (
-            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-300 rounded-lg p-3 whitespace-pre-line">
-              {warnMsg}
-            </div>
-          )}
           {errorMsg && parseStatus !== 'error' && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 whitespace-pre-line">
               {errorMsg}

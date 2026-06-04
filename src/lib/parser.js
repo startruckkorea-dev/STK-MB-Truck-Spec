@@ -364,9 +364,15 @@ export async function parseDocx(arrayBuffer) {
     });
   }
 
+  // mammoth 내부 경고(예: "An unrecognised element was ignored: w:tblPrEx")는
+  // 파싱 결과에 영향이 없어 사용자에게 노이즈이므로 제외한다.
+  const warnings = result.messages
+    .map((m) => m.message)
+    .filter((msg) => !/unrecognised element was ignored/i.test(msg));
+
   return {
     specs,
     modelYear,
-    warnings: result.messages.map((m) => m.message),
+    warnings,
   };
 }
