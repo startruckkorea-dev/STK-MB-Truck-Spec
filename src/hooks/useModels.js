@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from './useAuth';
+import { compareModels } from '../lib/modelSort';
 
 /**
  * 모델 목록 조회 (SharePoint 캐시 기반)
@@ -13,13 +14,7 @@ export function useModels() {
 
   const sorted = useMemo(() => {
     const list = isAdmin ? models : models.filter((m) => m.is_visible !== false);
-    return [...list].sort((a, b) => {
-      const y = String(b.model_year || '').localeCompare(String(a.model_year || ''));
-      if (y !== 0) return y;
-      const s = String(a.series || '').localeCompare(String(b.series || ''));
-      if (s !== 0) return s;
-      return String(a.code || '').localeCompare(String(b.code || ''));
-    });
+    return [...list].sort(compareModels);
   }, [models, isAdmin]);
 
   return { models: sorted, loading, error, refetch: reload };

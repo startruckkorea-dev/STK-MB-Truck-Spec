@@ -11,6 +11,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, us
 import { useAuth } from '../hooks/useAuth';
 import * as wb from '../lib/workbook';
 import { buildCodeIndex } from '../lib/codeIndex';
+import { compareModels } from '../lib/modelSort';
 
 const DataContext = createContext(null);
 
@@ -119,6 +120,11 @@ export function DataProvider({ children }) {
     const isNew = model.id == null;
     const modelId = isNew ? nextId(s.models) : Number(model.id);
     const modelRow = { ...model, id: modelId };
+    // 편집 폼은 sort_order 를 다루지 않으므로, 누락 시 기존 표시 순서를 보존한다.
+    if (modelRow.sort_order == null && !isNew) {
+      const prev = s.models.find((m) => sameId(m.id, modelId));
+      if (prev && prev.sort_order != null) modelRow.sort_order = prev.sort_order;
+    }
     const newModels = isNew
       ? [...s.models, modelRow]
       : s.models.map((m) => (sameId(m.id, modelId) ? modelRow : m));
@@ -160,19 +166,22 @@ export function DataProvider({ children }) {
   }
 
   /**
-   * 두 모델의 표시 순서를 맞바꾼다. 모델 목록은 시트 행 순서대로 표시되므로,
-   * 배열에서 두 모델의 위치를 교환하고 시트를 다시 쓰면 카드 순서가 바뀐다.
+   * 두 모델(idA, idB)의 표시 순서를 맞바꾼다.
+   * 화면 표시 순서(compareModels)대로 정렬한 뒤 두 모델 위치를 교환하고,
+   * 전체에 sort_order = 0,1,2… 를 다시 부여해 저장한다. sort_order 가 정렬의
+   * 1순위 키이므로 이렇게 해야 순서가 확실히 고정된다.
    * (specs/model_notes 는 model_id 로 참조하므로 행 순서 변경에 영향 없음)
    */
   async function moveModelOrder(idA, idB) {
     const s = stateRef.current;
-    const arr = [...s.models];
-    const ia = arr.findIndex((m) => sameId(m.id, idA));
-    const ib = arr.findIndex((m) => sameId(m.id, idB));
+    const ordered = [...s.models].sort(compareModels);
+    const ia = ordered.findIndex((m) => sameId(m.id, idA));
+    const ib = ordered.findIndex((m) => sameId(m.id, idB));
     if (ia < 0 || ib < 0 || ia === ib) return;
-    [arr[ia], arr[ib]] = [arr[ib], arr[ia]];
-    await wb.overwriteSheet('models', arr);
-    setState((st) => ({ ...st, models: arr }));
+    [ordered[ia], ordered[ib]] = [ordered[ib], ordered[ia]];
+    const renumbered = ordered.map((m, i) => ({ ...m, sort_order: i }));
+    await wb.overwriteSheet('models', renumbered);
+    setState((st) => ({ ...st, models: renumbered }));
   }
 
   async function setSpecHidden(specId, hidden) {

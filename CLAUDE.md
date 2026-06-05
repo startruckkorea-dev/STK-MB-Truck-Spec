@@ -104,7 +104,7 @@
 | 시트 | 컬럼 (순서대로) |
 |---|---|
 | `code_dict` | id, code, name_en, name_ko, category, hex_color, is_hidden |
-| `models` | id, series, code, axle, cabin, code_desc, name_ko, model_year, badge, is_visible |
+| `models` | id, series, code, axle, cabin, code_desc, name_ko, model_year, production_month, badge, is_visible, sort_order |
 | `specs` | id, model_id, category, spec_key, spec_value, label_ko, use_translate, is_color, is_hidden, sort_order |
 | `model_notes` | id, model_id, label, content, sort_order |
 | `users` | email, name, role, is_active |
