@@ -19,6 +19,9 @@ export default function ModelCard({
   model,
   isSelected,
   onCompareToggle,
+  onMoveLeft,
+  onMoveRight,
+  reordering = false,
 }) {
   const { isAdmin } = useAuth();
   const { setModelVisible } = useData();
@@ -96,14 +99,35 @@ export default function ModelCard({
           </Button>
         </div>
 
-        {/* admin 전용: 공개/숨기기 토글 */}
+        {/* admin 전용: 순서 이동 + 공개/숨기기 토글 */}
         {isAdmin && (
-          <button
-            onClick={toggleVisibility}
-            className="mt-2 sm:mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors py-1"
-          >
-            <span>{isHidden ? '공개하기' : '숨기기'}</span>
-          </button>
+          <div className="mt-2 sm:mt-3 flex items-center justify-between gap-2">
+            {/* 순서 이동 (그룹 내 좌/우) */}
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={onMoveLeft}
+                disabled={!onMoveLeft || reordering}
+                title="왼쪽으로 이동"
+                className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                ←
+              </button>
+              <button
+                onClick={onMoveRight}
+                disabled={!onMoveRight || reordering}
+                title="오른쪽으로 이동"
+                className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                →
+              </button>
+            </div>
+            <button
+              onClick={toggleVisibility}
+              className="flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors py-1"
+            >
+              <span>{isHidden ? '공개하기' : '숨기기'}</span>
+            </button>
+          </div>
         )}
       </div>
     </div>

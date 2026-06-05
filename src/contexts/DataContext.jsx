@@ -159,6 +159,22 @@ export function DataProvider({ children }) {
     setState((st) => ({ ...st, models: newModels }));
   }
 
+  /**
+   * 두 모델의 표시 순서를 맞바꾼다. 모델 목록은 시트 행 순서대로 표시되므로,
+   * 배열에서 두 모델의 위치를 교환하고 시트를 다시 쓰면 카드 순서가 바뀐다.
+   * (specs/model_notes 는 model_id 로 참조하므로 행 순서 변경에 영향 없음)
+   */
+  async function moveModelOrder(idA, idB) {
+    const s = stateRef.current;
+    const arr = [...s.models];
+    const ia = arr.findIndex((m) => sameId(m.id, idA));
+    const ib = arr.findIndex((m) => sameId(m.id, idB));
+    if (ia < 0 || ib < 0 || ia === ib) return;
+    [arr[ia], arr[ib]] = [arr[ib], arr[ia]];
+    await wb.overwriteSheet('models', arr);
+    setState((st) => ({ ...st, models: arr }));
+  }
+
   async function setSpecHidden(specId, hidden) {
     const s = stateRef.current;
     const idx = s.specs.findIndex((x) => sameId(x.id, specId));
@@ -208,6 +224,7 @@ export function DataProvider({ children }) {
     saveModel,
     deleteModel,
     setModelVisible,
+    moveModelOrder,
     setSpecHidden,
     upsertUser,
     deleteUser,

@@ -3,6 +3,8 @@ import Layout from '../components/Layout';
 import ModelCard from '../components/ModelCard';
 import CompareBar from '../components/CompareBar';
 import { useModels } from '../hooks/useModels';
+import { useData } from '../contexts/DataContext';
+import { useAuth } from '../hooks/useAuth';
 
 const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego'];
 
@@ -32,11 +34,14 @@ function sortBodyTypes(types) {
 
 export default function Models() {
   const { models, loading, error } = useModels();
+  const { moveModelOrder } = useData();
+  const { isAdmin } = useAuth();
 
   const [activeSeries, setActiveSeries] = useState('전체');
   const [selectedYear, setSelectedYear] = useState('');
   const [search, setSearch] = useState('');
   const [compareList, setCompareList] = useState([]);
+  const [reordering, setReordering] = useState(false);
 
   // 연식 목록 (중복 제거, 최신순)
   const years = useMemo(() => {
@@ -90,6 +95,18 @@ export default function Models() {
 
   function removeFromCompare(modelId) {
     setCompareList((prev) => prev.filter((m) => m.id !== modelId));
+  }
+
+  // 같은 그룹 내 두 모델의 표시 순서를 맞바꿈 (admin 전용)
+  async function moveModel(idA, idB) {
+    if (reordering) return;
+    setReordering(true);
+    try {
+      await moveModelOrder(idA, idB);
+    } catch (e) {
+      alert(e.message);
+    }
+    setReordering(false);
   }
 
   return (
@@ -190,12 +207,23 @@ export default function Models() {
                       </div>
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                      {bodyModels.map((model) => (
+                      {bodyModels.map((model, idx) => (
                         <ModelCard
                           key={model.id}
                           model={model}
                           isSelected={compareList.some((m) => m.id === model.id)}
                           onCompareToggle={toggleCompare}
+                          reordering={reordering}
+                          onMoveLeft={
+                            isAdmin && idx > 0
+                              ? () => moveModel(model.id, bodyModels[idx - 1].id)
+                              : null
+                          }
+                          onMoveRight={
+                            isAdmin && idx < bodyModels.length - 1
+                              ? () => moveModel(model.id, bodyModels[idx + 1].id)
+                              : null
+                          }
                         />
                       ))}
                     </div>
