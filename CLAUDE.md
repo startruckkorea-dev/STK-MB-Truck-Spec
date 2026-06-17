@@ -39,14 +39,17 @@
 |---|---|
 | `sales` 영업직원 | 모델 목록 조회, 사양 상세(국문 표시), 비교 |
 | `staff` 본사직원 | 위 + 영문 코드 열람 |
-| `admin` 관리자(상품기획팀) | 위 전체 + 모델 등록/수정, 코드 사전 관리, 사용자 관리 |
+| `admin` 관리자(상품기획팀) | 위 전체 + 모델 등록/수정, 코드 사전 관리 |
 
-- **로그인:** Microsoft 365 회사 계정 (MSAL 팝업). 이메일/비밀번호 직접 입력 없음.
-- **역할:** SharePoint 워크북의 `users` 시트로 관리 (`/admin/users` 에서 편집).
-- **부트스트랩:** `users` 시트에 `admin` 이 한 명도 없으면 로그인한 사용자를 모두 `admin`
-  으로 취급(최초 셋업용). admin 이 한 명이라도 등록되면, 미등록 사용자는 `sales` 기본.
-- ⚠️ 앱을 쓰려면 SharePoint 워크북 파일의 **"읽기" 권한**도 필요하다 (관리자는 "편집").
-  규모 10~50명.
+- **로그인:** Microsoft 365 회사 계정 (MSAL 팝업). 회사 계정이면 누구나 로그인된다.
+- **역할:** SharePoint `Access` 폴더의 접근권한 엑셀(`Access_List_*.xlsx`)로만 관리한다.
+  앱 안에는 사용자/역할 편집 화면이 없다 — **엑셀을 직접 편집**해야 한다.
+  - `G` 컬럼 = 이메일(키), `H` 컬럼 = 권한(`Admin`/`Staff`/`Sales`). 1행은 헤더.
+  - 역할은 앱에서 클릭으로 바꿀 수 없다(전환 UI 없음). 상단 바에 현재 역할 배지만 표시.
+- **부트스트랩:** 목록에 `admin` 이 한 명도 없으면 로그인한 사용자를 모두 `admin` 으로
+  취급(최초 셋업/락아웃 방지). admin 이 한 명이라도 있으면 미등록 사용자는 `sales` 기본.
+- ⚠️ 앱을 쓰려면 SharePoint 워크북 파일과 `Access` 파일의 **"읽기" 권한**이 필요하다
+  (관리자는 데이터 워크북 "편집"). 규모 10~50명.
 
 ---
 
@@ -54,7 +57,7 @@
 
 ### 1. 로그인 (`/login`)
 - Microsoft 365 계정으로 로그인 (MSAL 팝업)
-- 로그인 후 역할(`users` 시트)에 따라 네비게이션 메뉴 다르게 표시
+- 로그인 후 역할(`Access` 엑셀)에 따라 네비게이션 메뉴·열람 범위 다르게 표시
 
 ### 2. 모델 목록 페이지 (`/models`)
 - 등록된 모델 카드 그리드 표시 (MY별·차종별 그룹)
@@ -87,8 +90,10 @@
 - `code_dict` 시트 CRUD (영문 코드 ↔ 국문명, 분류, HEX 컬러, 숨김)
 - 상단 패널에서 SharePoint Excel 파일 바로 열기 + [다시 불러오기]
 
-### 7. 관리자 — 사용자 (`/admin/users`)
-- `users` 시트 CRUD (이메일, 이름, 역할, 활성)
+### 7. 사용자 권한 관리 — 앱 화면 없음
+- 역할은 SharePoint `Access` 폴더의 `Access_List_*.xlsx` 를 **직접 편집**해 관리한다
+  (`G`=이메일, `H`=권한). 앱에는 사용자 관리 화면이 없다.
+- [src/lib/accessList.js](src/lib/accessList.js) 가 이 파일을 읽어 로그인 사용자 역할을 정한다.
 
 ---
 
@@ -98,7 +103,7 @@
 `.xlsx` 파일 1개. 앱([src/lib/workbook.js](src/lib/workbook.js))이 그 폴더의 `.xlsx` 를
 **자동 탐색**한다 (파일명 무관, 폴더에 `.xlsx` 는 하나만 둘 것).
 
-워크북은 시트 5개. 각 시트 **1행 = 헤더, 2행부터 데이터**. 컬럼 **순서**가 중요하다
+워크북은 시트 4개. 각 시트 **1행 = 헤더, 2행부터 데이터**. 컬럼 **순서**가 중요하다
 (앱이 위치 기준으로 읽음). 불리언은 `TRUE`/`FALSE`.
 
 | 시트 | 컬럼 (순서대로) |
@@ -107,7 +112,9 @@
 | `models` | id, series, code, axle, cabin, code_desc, name_ko, model_year, production_month, badge, is_visible, sort_order |
 | `specs` | id, model_id, category, spec_key, spec_value, label_ko, use_translate, is_color, is_hidden, sort_order |
 | `model_notes` | id, model_id, label, content, sort_order |
-| `users` | email, name, role, is_active |
+
+> 역할 권한은 이 데이터 워크북이 아니라 별도의 `Access/Access_List_*.xlsx`(G=이메일, H=권한)로
+> 관리한다. ([src/lib/accessList.js](src/lib/accessList.js)) (과거 `users` 시트는 더 이상 역할에 쓰이지 않음)
 
 **관계:**
 - `specs.model_id`, `model_notes.model_id` → `models.id`
@@ -129,9 +136,10 @@
 | [src/lib/graph.js](src/lib/graph.js) | Microsoft Graph REST 호출 (토큰 부착, 429/503 재시도) |
 | [src/lib/workbook.js](src/lib/workbook.js) | 워크북 시트 읽기(usedRange)/쓰기(range PATCH·delete) |
 | [src/lib/sourceFiles.js](src/lib/sourceFiles.js) | SharePoint 견적서(.docx) 원본 폴더 탐색·다운로드 |
+| [src/lib/accessList.js](src/lib/accessList.js) | SharePoint `Access` 폴더 접근권한 엑셀(G=이메일, H=권한) 읽기 |
 | [src/lib/codeIndex.js](src/lib/codeIndex.js) | `code_dict` → 코드 인덱스, 사양값 번역 매칭 |
-| [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 5개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
-| [src/hooks/useAuth.jsx](src/hooks/useAuth.jsx) | MSAL 인증 + `users` 시트 기반 역할 |
+| [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 데이터 4개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
+| [src/hooks/useAuth.jsx](src/hooks/useAuth.jsx) | MSAL 인증 + `Access` 엑셀 기반 역할 |
 | [src/hooks/useDict.js](src/hooks/useDict.js), [src/hooks/useModels.js](src/hooks/useModels.js) | DataContext 캐시 기반 조회 훅 |
 
 동시 편집은 소규모 팀 기준 last-write-wins. 단건 쓰기 전 해당 행을 재확인해 충돌을 완화한다.
@@ -173,6 +181,7 @@ mb-truck-spec/
 │   │   ├── graph.js           ← Microsoft Graph REST 헬퍼
 │   │   ├── workbook.js        ← SharePoint Excel 워크북 액세스
 │   │   ├── sourceFiles.js     ← SharePoint 견적서(.docx) 폴더 탐색
+│   │   ├── accessList.js      ← SharePoint Access 폴더 접근권한 엑셀 읽기
 │   │   ├── codeIndex.js       ← 코드 사전 매칭 유틸
 │   │   ├── parser.js          ← .docx 파싱 (mammoth) + 파일명 기본정보 추출
 │   │   └── export.js          ← 사양 Excel/PDF 내보내기
@@ -186,7 +195,7 @@ mb-truck-spec/
 │   │   ├── CompareTable.jsx, CompareBar.jsx, ColorSwatch.jsx
 │   ├── pages/
 │   │   ├── Login.jsx, Models.jsx, ModelDetail.jsx, Compare.jsx
-│   │   └── admin/AdminModels.jsx, AdminModelEdit.jsx, AdminDict.jsx, AdminUsers.jsx
+│   │   └── admin/AdminModels.jsx, AdminModelEdit.jsx, AdminDict.jsx
 │   ├── hooks/
 │   │   ├── useAuth.jsx, useModels.js, useDict.js, useSpecLang.jsx
 │   └── styles/index.css
@@ -222,11 +231,12 @@ npx vercel deploy --prod --yes   # 운영 배포 → mbtruck-spec.startruckkorea
 VITE_MSAL_CLIENT_ID=...
 VITE_MSAL_TENANT_ID=...
 
-# SharePoint 위치 — 미설정 시 workbook.js / sourceFiles.js 기본값
+# SharePoint 위치 — 미설정 시 workbook.js / sourceFiles.js / accessList.js 기본값
 VITE_SP_HOSTNAME=startruckkorea.sharepoint.com
 VITE_SP_SITE_PATH=/sites/STK-PMM
 VITE_SP_FOLDER_PATH=mbtruck-spec/Code          # 데이터 워크북(.xlsx) 폴더
 VITE_SP_QUOTATION_PATH=mbtruck-spec/Quotation  # 견적서(.docx) 원본 폴더
+VITE_SP_ACCESS_PATH=mbtruck-spec/Access        # 접근권한 엑셀(Access_List_*.xlsx) 폴더
 
 # 앱 타이틀
 VITE_APP_TITLE=...
@@ -245,6 +255,7 @@ VITE_APP_TITLE=...
 **SharePoint:**
 - 사이트: `https://startruckkorea.sharepoint.com/sites/STK-PMM/`
 - 데이터 워크북 폴더: `Shared Documents/mbtruck-spec/Code/`
+- 접근권한 엑셀 폴더: `Shared Documents/mbtruck-spec/Access/` (`Access_List_*.xlsx`, G=이메일·H=권한)
 - 견적서(.docx) 원본 폴더: `Shared Documents/mbtruck-spec/Quotation/`
   - 하위를 MY 연도(`MY26`, `MY27` …) → 생산월(`2026-04` …) 폴더로 구분.
   - 모델 등록 시 이 폴더를 탐색해 .docx 를 바로 선택한다 (앱이 폴더명 무관하게

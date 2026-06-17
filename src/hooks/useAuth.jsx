@@ -6,14 +6,15 @@ import {
   getMicrosoftAccount,
   signOutMicrosoft,
 } from '../lib/msal';
-import { readSheet } from '../lib/workbook';
+import { readAccessList } from '../lib/accessList';
 
 const AuthContext = createContext(null);
 
 /**
  * 인증 = Microsoft 365(MSAL) 전용.
- * 역할(admin/staff/sales)은 SharePoint 워크북 `users` 시트로 결정한다.
- * 부트스트랩: 등록된 admin 이 한 명도 없으면 로그인한 사용자를 모두 admin 으로 취급.
+ * 역할(admin/staff/sales)은 SharePoint `Access/Access_List_*.xlsx` 의
+ * G 컬럼(이메일)·H 컬럼(권한)으로 결정한다.
+ * 부트스트랩: 목록에 admin 이 한 명도 없으면 로그인한 사용자를 모두 admin 으로 취급.
  */
 export function AuthProvider({ children }) {
   const [msAccount, setMsAccount] = useState(null);
@@ -57,24 +58,22 @@ export function AuthProvider({ children }) {
     return () => unsubscribe && unsubscribe();
   }, []);
 
-  // ─── 역할 결정: users 시트 조회 ─────────────────────────────────
+  // ─── 역할 결정: Access List(.xlsx) 조회 ─────────────────────────
   useEffect(() => {
     if (!msAccount) { setRole(null); return; }
     let cancelled = false;
     (async () => {
       const email = String(msAccount.username || '').trim().toLowerCase();
       try {
-        const users = await readSheet('users');
+        const access = await readAccessList();
         if (cancelled) return;
-        const match = users.find(
-          (u) => String(u.email || '').trim().toLowerCase() === email
-        );
-        const hasAdmin = users.some((u) => (u.role || '') === 'admin');
-        if (match) setRole(match.role || 'sales');
-        else if (!hasAdmin) setRole('admin'); // 부트스트랩
-        else setRole('sales');
+        const match = access.find((a) => a.email === email);
+        const hasAdmin = access.some((a) => a.role === 'admin');
+        if (match) setRole(match.role); // 이미 admin/staff/sales 로 정규화됨
+        else if (!hasAdmin) setRole('admin'); // 부트스트랩(목록에 admin 부재)
+        else setRole('sales'); // 미등록 사용자는 최소 권한
       } catch {
-        // users 시트를 못 읽으면 최소 권한(sales)로 — 워크북 오류는 DataContext가 안내
+        // 목록을 못 읽으면 최소 권한(sales)로
         if (!cancelled) setRole('sales');
       }
     })();

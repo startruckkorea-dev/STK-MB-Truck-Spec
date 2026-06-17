@@ -78,18 +78,6 @@ export default function Layout({ children }) {
                   >
                     코드 사전
                   </NavLink>
-                  <NavLink
-                    to="/admin/users"
-                    className={({ isActive }) =>
-                      `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-mb-blue text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`
-                    }
-                  >
-                    사용자
-                  </NavLink>
                 </>
               )}
             </nav>
@@ -99,9 +87,20 @@ export default function Layout({ children }) {
               <div className="hidden sm:block">
                 <LangToggle />
               </div>
-              <span className="text-xs text-gray-500 hidden sm:block truncate max-w-[120px]">
-                {profile?.name || profile?.role}
-              </span>
+              <div className="hidden sm:flex items-center gap-1.5 min-w-0">
+                <span className="text-xs text-gray-500 truncate max-w-[120px]">
+                  {profile?.name || profile?.email}
+                </span>
+                {profile?.role && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none ${
+                      ROLE_BADGE_CLS[profile.role] || ROLE_BADGE_CLS.sales
+                    }`}
+                  >
+                    {ROLE_LABEL[profile.role] || profile.role}
+                  </span>
+                )}
+              </div>
               <button
                 onClick={handleSignOut}
                 className="hidden sm:block px-3 py-1.5 rounded text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
@@ -173,27 +172,25 @@ export default function Layout({ children }) {
                   >
                     코드 사전
                   </NavLink>
-                  <NavLink
-                    to="/admin/users"
-                    onClick={() => setMenuOpen(false)}
-                    className={({ isActive }) =>
-                      `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-mb-blue text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`
-                    }
-                  >
-                    사용자
-                  </NavLink>
                 </>
               )}
               <div className="border-t border-gray-100 pt-2 mt-1">
                 <div className="px-3 py-2">
                   <LangToggle />
                 </div>
-                <div className="px-3 py-1 text-xs text-gray-400">
-                  {profile?.name || profile?.role}
+                <div className="px-3 py-1 flex items-center gap-1.5">
+                  <span className="text-xs text-gray-400 truncate">
+                    {profile?.name || profile?.email}
+                  </span>
+                  {profile?.role && (
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none ${
+                        ROLE_BADGE_CLS[profile.role] || ROLE_BADGE_CLS.sales
+                      }`}
+                    >
+                      {ROLE_LABEL[profile.role] || profile.role}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={() => { setMenuOpen(false); handleSignOut(); }}

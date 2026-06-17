@@ -9,7 +9,6 @@ import Compare from './pages/Compare';
 import AdminModels from './pages/admin/AdminModels';
 import AdminModelEdit from './pages/admin/AdminModelEdit';
 import AdminDict from './pages/admin/AdminDict';
-import AdminUsers from './pages/admin/AdminUsers';
 
 // ─── 라우트 가드 ──────────────────────────────────────────────
 function RequireAuth({ children }) {
@@ -55,7 +54,6 @@ export default function App() {
       <Route path="/admin/models/new" element={<RequireAdmin><AdminModelEdit /></RequireAdmin>} />
       <Route path="/admin/models/:id/edit" element={<RequireAdmin><AdminModelEdit /></RequireAdmin>} />
       <Route path="/admin/dict" element={<RequireAdmin><AdminDict /></RequireAdmin>} />
-      <Route path="/admin/users" element={<RequireAdmin><AdminUsers /></RequireAdmin>} />
 
       {/* 기본 리다이렉트 */}
       <Route path="/" element={<Navigate to="/models" replace />} />

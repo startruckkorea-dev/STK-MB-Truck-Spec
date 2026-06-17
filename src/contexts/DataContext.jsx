@@ -15,7 +15,7 @@ import { compareModels } from '../lib/modelSort';
 
 const DataContext = createContext(null);
 
-const EMPTY = { codeDict: [], models: [], specs: [], modelNotes: [], users: [] };
+const EMPTY = { codeDict: [], models: [], specs: [], modelNotes: [] };
 
 /** 배열에서 다음 정수 id (max + 1) */
 const nextId = (arr) => arr.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) + 1;
@@ -39,14 +39,13 @@ export function DataProvider({ children }) {
     setLoading(true);
     setError(null);
     try {
-      const [codeDict, models, specs, modelNotes, users] = await Promise.all([
+      const [codeDict, models, specs, modelNotes] = await Promise.all([
         wb.readSheet('code_dict'),
         wb.readSheet('models'),
         wb.readSheet('specs'),
         wb.readSheet('model_notes'),
-        wb.readSheet('users'),
       ]);
-      setState({ codeDict, models, specs, modelNotes, users });
+      setState({ codeDict, models, specs, modelNotes });
       setLoaded(true);
     } catch (e) {
       const msg = /404|찾지 못/.test(e.message)
@@ -193,30 +192,8 @@ export function DataProvider({ children }) {
     setState((st) => ({ ...st, specs: st.specs.map((x, i) => (i === idx ? updated : x)) }));
   }
 
-  // ─── users ────────────────────────────────────────────────────────
-  async function saveUsers(newUsers) {
-    await wb.overwriteSheet('users', newUsers);
-    setState((st) => ({ ...st, users: newUsers }));
-  }
-
-  async function upsertUser(u) {
-    const cur = stateRef.current.users;
-    const email = String(u.email || '').trim().toLowerCase();
-    if (!email) throw new Error('이메일은 필수입니다.');
-    const exists = cur.some((x) => String(x.email).trim().toLowerCase() === email);
-    const newUsers = exists
-      ? cur.map((x) => (String(x.email).trim().toLowerCase() === email ? { ...x, ...u, email } : x))
-      : [...cur, { is_active: true, role: 'sales', ...u, email }];
-    await saveUsers(newUsers);
-  }
-
-  async function deleteUser(email) {
-    const key = String(email).trim().toLowerCase();
-    const newUsers = stateRef.current.users.filter(
-      (x) => String(x.email).trim().toLowerCase() !== key
-    );
-    await saveUsers(newUsers);
-  }
+  // 역할(권한)은 SharePoint `Access/Access_List_*.xlsx` 로만 관리한다.
+  // 앱에서 사용자 CRUD 를 하지 않으므로 users 시트 관련 로직은 두지 않는다.
 
   // 코드 사전 번역 인덱스 (정규화된 MB 코드 → 행)
   const codeIndex = useMemo(() => buildCodeIndex(state.codeDict), [state.codeDict]);
@@ -235,8 +212,6 @@ export function DataProvider({ children }) {
     setModelVisible,
     moveModelOrder,
     setSpecHidden,
-    upsertUser,
-    deleteUser,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
