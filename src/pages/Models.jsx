@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import ModelCard from '../components/ModelCard';
 import CompareBar from '../components/CompareBar';
@@ -324,7 +324,6 @@ export default function Models() {
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">캐빈</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">생산월</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">사양상세</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">비교</th>
                         {isAdmin && (
                           <>
@@ -388,14 +387,6 @@ export default function Models() {
                             </td>
                             <td className="px-3 py-2.5 font-mono text-xs text-mb-blue font-semibold whitespace-nowrap">
                               {model.production_month || <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                              <Link
-                                to={`/models/${model.id}`}
-                                className="inline-block px-2.5 py-1 text-xs text-mb-blue hover:bg-blue-50 rounded transition-colors"
-                              >
-                                사양 상세
-                              </Link>
                             </td>
                             <td className="px-3 py-2.5 text-center whitespace-nowrap">
                               <button

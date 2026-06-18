@@ -39,7 +39,13 @@ function CategoryGroup({ category, items, dict, language, isAdmin, canViewCodes,
   // 숨겨진 항목 개수 (sales는 아예 렌더 안 함)
   const visibleItems = isAdmin
     ? items
-    : items.filter((s) => !s.is_hidden && !dict[s.spec_value]?.is_hidden);
+    : items.filter((s) => {
+        if (s.is_hidden || dict[s.spec_value]?.is_hidden) return false;
+        // 영업직원: 국문 번역이 없는 영문 코드(번역 미사용) 항목은 숨김.
+        // Admin/Staff(canViewCodes)는 그대로 노출.
+        if (!canViewCodes && !s.use_translate) return false;
+        return true;
+      });
 
   if (visibleItems.length === 0 && !isAdmin) return null;
 
