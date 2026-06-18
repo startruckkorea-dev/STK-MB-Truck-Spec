@@ -41,9 +41,9 @@ export default function Login() {
         {/* 로고 */}
         <div className="text-center mb-8">
           <img
-            src="/MB_Star_Logo_black.png"
-            alt="Mercedes-Benz Star"
-            className="h-16 w-auto mx-auto mb-4"
+            src="/mb-trucks-logo.png"
+            alt="Mercedes-Benz Trucks"
+            className="h-12 w-auto mx-auto mb-4"
           />
           <h1 className="font-barlow font-bold text-2xl text-gray-900 tracking-wide">
             메르세데스-벤츠 트럭

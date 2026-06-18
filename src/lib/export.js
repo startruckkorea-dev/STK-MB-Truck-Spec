@@ -130,6 +130,60 @@ function finalizeSheet(ws) {
   });
 }
 
+// ─── 로고 (문서 상단 중앙) ──────────────────────────────────────
+const LOGO_URL = '/star-logo.png';
+
+// PNG 를 base64 로 1회 로드 (Excel addImage 용). 실패 시 null.
+let logoBase64Promise = null;
+function getLogoBase64() {
+  if (!logoBase64Promise) {
+    logoBase64Promise = fetch(LOGO_URL)
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('logo'))))
+      .then(
+        (blob) =>
+          new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(String(fr.result).split(',')[1]);
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+          })
+      )
+      .catch(() => null);
+  }
+  return logoBase64Promise;
+}
+
+// 목표 X(px)가 어느 열의 몇 % 지점인지 → ExcelJS tl.col 용 소수 컬럼 인덱스
+function pxToColOffset(widthsPx, x) {
+  let col = 0;
+  let acc = 0;
+  while (col < widthsPx.length && acc + widthsPx[col] <= x) {
+    acc += widthsPx[col];
+    col++;
+  }
+  const frac = col < widthsPx.length ? (x - acc) / widthsPx[col] : 0;
+  return col + frac;
+}
+
+// 시트 최상단 중앙에 정사각형 로고 삽입 (columns 설정 후 호출)
+async function addExcelLogo(wb, ws) {
+  const base64 = await getLogoBase64();
+  if (!base64) return;
+  const imageId = wb.addImage({ base64, extension: 'png' });
+  const sizePx = 60;
+  const logoRow = ws.addRow([]);
+  logoRow.height = 50; // pt — 60px 로고 수용
+  const widthsPx = ws.columns.map((c) => (c.width || 10) * 7);
+  const totalPx = widthsPx.reduce((a, b) => a + b, 0);
+  const leftX = Math.max(0, (totalPx - sizePx) / 2);
+  ws.addImage(imageId, {
+    tl: { col: pxToColOffset(widthsPx, leftX), row: logoRow.number - 1 + 0.05 },
+    ext: { width: sizePx, height: sizePx },
+    editAs: 'oneCell',
+  });
+  ws.addRow([]); // 로고와 타이틀 사이 여백
+}
+
 async function saveWorkbook(wb, filename) {
   const buffer = await wb.xlsx.writeBuffer();
   saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
@@ -152,6 +206,9 @@ export async function exportDetailToExcel(model, specs, dict, notes = [], langua
   ws.columns = canViewCodes
     ? [{ width: 32 }, { width: 22 }, { width: 42 }]
     : [{ width: 34 }, { width: 46 }];
+
+  // 로고 (상단 중앙)
+  await addExcelLogo(wb, ws);
 
   // 타이틀
   applyTitleRow(ws, title, colCount);
@@ -207,7 +264,7 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
     notesHtml = `
       <div class="category">보충 설명</div>
       <table>
-        <thead><tr><th style="width:35%">항목</th><th>내용</th></tr></thead>
+        <colgroup><col style="width:35%"><col></colgroup>
         <tbody>
           ${notes.map((n, i) => `<tr class="${i % 2 === 0 ? 'even' : ''}"><td>${esc(n.label)}</td><td>${esc(n.content)}</td></tr>`).join('')}
         </tbody>
@@ -215,10 +272,13 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
     `;
   }
 
+  const specColgroup = canViewCodes
+    ? '<col style="width:35%"><col style="width:20%"><col>'
+    : '<col style="width:35%"><col>';
   const specsHtml = groups.map(({ category, items }) => `
     <div class="category">${esc(category)}</div>
     <table>
-      <thead><tr><th style="width:35%">항목</th>${canViewCodes ? '<th style="width:20%">코드</th>' : ''}<th>값</th></tr></thead>
+      <colgroup>${specColgroup}</colgroup>
       <tbody>
         ${items.map((spec, i) => `
           <tr class="${i % 2 === 0 ? 'even' : ''}">
@@ -251,6 +311,9 @@ export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}
     { width: 32 },
     ...models.map(() => ({ width: 30 })),
   ];
+
+  // 로고 (상단 중앙)
+  await addExcelLogo(wb, ws);
 
   // 타이틀
   const titleText = models.map((m) => modelFullName(m)).join(' vs ');
@@ -427,6 +490,15 @@ function openPrintWindow(title, bodyHtml, landscape = false) {
     print-color-adjust: exact;
   }
 
+  .logo {
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .logo img {
+    height: 60px;
+    width: auto;
+  }
+
   .header {
     border-bottom: 3px solid #00ADEF;
     padding: 16px 0 12px;
@@ -514,12 +586,15 @@ function openPrintWindow(title, bodyHtml, landscape = false) {
       인쇄 대화상자에서 "PDF로 저장"을 선택하세요
     </span>
   </div>
+  <div class="logo">
+    <img src="${window.location.origin}${LOGO_URL}" alt="logo" />
+  </div>
   <div class="header">
     <h1>${esc(title)}</h1>
     <div class="date">생성일: ${new Date().toLocaleDateString('ko-KR')}</div>
   </div>
   ${bodyHtml}
-  <div class="footer">MB Trucks Korea — Spec Viewer</div>
+  <div class="footer">Star Truck Korea</div>
 </body>
 </html>`);
   w.document.close();

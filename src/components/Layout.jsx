@@ -29,8 +29,8 @@ export default function Layout({ children }) {
             {/* 좌측: 로고 + 제목 */}
             <Link to="/models" className="flex items-center gap-2 sm:gap-3 min-w-0">
               <img
-                src="/MB_Star_Logo_black.png"
-                alt="MB Star"
+                src="/mb-trucks-logo.png"
+                alt="Mercedes-Benz Trucks"
                 className="h-6 sm:h-7 w-auto flex-shrink-0"
               />
               <span className="font-noto font-bold text-base sm:text-lg text-gray-900 leading-none whitespace-nowrap">
