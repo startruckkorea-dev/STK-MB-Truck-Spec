@@ -11,7 +11,7 @@ import { useAuth } from '../hooks/useAuth';
  * dict: { [code]: { name_ko, hex_color, is_hidden, category } }
  */
 export default function CompareTable({ models, specsMap, notesMap = {}, dict, showDiffOnly = false, language = 'ko' }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, canViewCodes } = useAuth();
 
   // 모든 모델의 spec_key 유니온 (카테고리 + 순서 유지)
   const allKeys = buildAllKeys(models, specsMap, isAdmin, dict);
@@ -142,7 +142,8 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
                 style={isDifferent ? { backgroundColor: 'rgba(0,173,239,0.06)' } : {}}
               >
                 <td className="px-2 sm:px-4 py-1.5 sm:py-2.5 text-gray-700 align-top text-sm sticky left-0 bg-white z-10">
-                  {row.labelKo || row.spec_key}
+                  {/* 국문 라벨 우선. 없으면 admin/staff 는 영문 코드, 영업직원은 숨김 */}
+                  {row.labelKo || (canViewCodes ? row.spec_key : '')}
                 </td>
                 {values.map((spec, i) => (
                   <td key={models[i].id} className="px-2 sm:px-4 py-1.5 sm:py-2.5 align-top">

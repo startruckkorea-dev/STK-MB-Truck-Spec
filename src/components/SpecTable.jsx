@@ -41,9 +41,11 @@ function CategoryGroup({ category, items, dict, language, isAdmin, canViewCodes,
     ? items
     : items.filter((s) => {
         if (s.is_hidden || dict[s.spec_value]?.is_hidden) return false;
-        // 영업직원: 국문 번역이 없는 영문 코드(번역 미사용) 항목은 숨김.
-        // Admin/Staff(canViewCodes)는 그대로 노출.
-        if (!canViewCodes && !s.use_translate) return false;
+        // 영업직원(코드 열람 불가): 국문 라벨도 없고 번역도 없는 코드 전용 항목은
+        // 영문 코드밖에 보여줄 게 없으므로 통째로 숨김. Admin/Staff 는 노출.
+        if (!canViewCodes && s.use_translate && !s.label_ko && !dict[s.spec_value]) {
+          return false;
+        }
         return true;
       });
 
@@ -108,7 +110,9 @@ function CategoryGroup({ category, items, dict, language, isAdmin, canViewCodes,
                 className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 ${showDimmed ? 'opacity-40' : ''}`}
               >
                 <div className="text-gray-500 text-xs sm:text-sm w-2/5 sm:w-1/3 flex-shrink-0 break-words">
-                  {spec.label_ko || spec.spec_key}
+                  {/* 국문 라벨 우선. 라벨이 없으면 admin/staff 는 영문 코드,
+                      영업직원은 코드를 숨기고 빈 칸 (값 칸의 국문 번역으로 충분) */}
+                  {spec.label_ko || (canViewCodes ? spec.spec_key : '')}
                 </div>
                 <div className="text-gray-900 flex-1 min-w-0">
                   {displayValue}
