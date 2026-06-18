@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import ModelCard from '../components/ModelCard';
 import CompareBar from '../components/CompareBar';
@@ -43,6 +43,7 @@ export default function Models() {
   const { models, loading, error } = useModels();
   const { moveModelOrder, modelNotes, setModelVisible } = useData();
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
 
   const [activeSeries, setActiveSeries] = useState('전체');
   const [selectedYear, setSelectedYear] = useState('');
@@ -50,7 +51,7 @@ export default function Models() {
   const [compareList, setCompareList] = useState([]);
   const [reordering, setReordering] = useState(false);
   const [viewMode, setViewMode] = useState(
-    () => localStorage.getItem(VIEW_KEY) || 'tile'
+    () => localStorage.getItem(VIEW_KEY) || 'list'
   );
 
   function changeView(mode) {
@@ -319,7 +320,7 @@ export default function Models() {
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">차종분류</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">시리즈</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">모델코드</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">축구성</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">축</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">캐빈</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">생산월</th>
@@ -343,7 +344,8 @@ export default function Models() {
                         return (
                           <tr
                             key={model.id}
-                            className={`hover:bg-gray-50 transition-colors ${!model.is_visible ? 'opacity-50' : ''}`}
+                            onClick={() => navigate(`/models/${model.id}`)}
+                            className={`hover:bg-gray-50 transition-colors cursor-pointer ${!model.is_visible ? 'opacity-50' : ''}`}
                           >
                             <td className="px-3 py-2.5 whitespace-nowrap">
                               {model.name_ko ? (
@@ -357,13 +359,13 @@ export default function Models() {
                                 {model.series}
                               </Badge>
                             </td>
-                            <td className="px-3 py-2.5 font-mono text-xs text-gray-800 whitespace-nowrap">
+                            <td className="px-3 py-2.5 font-mono text-sm text-gray-800 whitespace-nowrap">
                               {model.code}
                             </td>
-                            <td className="px-3 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">
+                            <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
                               {model.axle || <span className="text-gray-300">—</span>}
                             </td>
-                            <td className="px-3 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">
+                            <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
                               {model.cabin || <span className="text-gray-300">—</span>}
                             </td>
                             <td className="px-3 py-2.5">
@@ -397,7 +399,7 @@ export default function Models() {
                             </td>
                             <td className="px-3 py-2.5 text-center whitespace-nowrap">
                               <button
-                                onClick={() => toggleCompare(model)}
+                                onClick={(e) => { e.stopPropagation(); toggleCompare(model); }}
                                 className={`px-2.5 py-1 text-xs rounded border transition-colors ${
                                   isSelected
                                     ? 'bg-mb-blue text-white border-mb-blue'
@@ -422,7 +424,7 @@ export default function Models() {
                                 </td>
                                 <td className="px-3 py-2.5 text-center whitespace-nowrap">
                                   <button
-                                    onClick={() => toggleVisibility(model)}
+                                    onClick={(e) => { e.stopPropagation(); toggleVisibility(model); }}
                                     className="px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
                                   >
                                     {model.is_visible ? '숨기기' : '공개하기'}
@@ -431,7 +433,7 @@ export default function Models() {
                                 <td className="px-3 py-2.5 text-center whitespace-nowrap">
                                   <div className="flex items-center justify-center gap-0.5">
                                     <button
-                                      onClick={() => moveModel(model.id, yearModels[idx - 1].id)}
+                                      onClick={(e) => { e.stopPropagation(); moveModel(model.id, yearModels[idx - 1].id); }}
                                       disabled={idx === 0 || reordering}
                                       title="위로 이동"
                                       className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
@@ -439,7 +441,7 @@ export default function Models() {
                                       ↑
                                     </button>
                                     <button
-                                      onClick={() => moveModel(model.id, yearModels[idx + 1].id)}
+                                      onClick={(e) => { e.stopPropagation(); moveModel(model.id, yearModels[idx + 1].id); }}
                                       disabled={idx === yearModels.length - 1 || reordering}
                                       title="아래로 이동"
                                       className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
