@@ -143,17 +143,15 @@ function modelFullName(m) {
   return `${m.series} ${m.code}${m.axle ? ` ${m.axle}` : ''}${m.cabin ? ` ${m.cabin}` : ''}`;
 }
 
-export async function exportDetailToExcel(model, specs, dict, notes = [], language = 'ko') {
+export async function exportDetailToExcel(model, specs, dict, notes = [], language = 'ko', canViewCodes = true) {
   const title = `${modelFullName(model)} (${model.model_year})`;
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(title.slice(0, 31));
 
-  const colCount = 3;
-  ws.columns = [
-    { width: 32 },
-    { width: 22 },
-    { width: 42 },
-  ];
+  const colCount = canViewCodes ? 3 : 2;
+  ws.columns = canViewCodes
+    ? [{ width: 32 }, { width: 22 }, { width: 42 }]
+    : [{ width: 34 }, { width: 46 }];
 
   // 타이틀
   applyTitleRow(ws, title, colCount);
@@ -164,21 +162,27 @@ export async function exportDetailToExcel(model, specs, dict, notes = [], langua
   // 보충 설명
   if (notes.length > 0) {
     applyCategoryRow(ws, '보충 설명', colCount);
-    applyHeaderRow(ws, ['항목', '내용', '']);
+    applyHeaderRow(ws, canViewCodes ? ['항목', '내용', ''] : ['항목', '내용']);
     notes.forEach((note, i) => {
-      applyDataRow(ws, [note.label, note.content, ''], { even: i % 2 === 0 });
+      const vals = canViewCodes ? [note.label, note.content, ''] : [note.label, note.content];
+      applyDataRow(ws, vals, { even: i % 2 === 0 });
     });
     ws.addRow([]);
   }
 
-  // 사양 데이터
-  applyHeaderRow(ws, ['항목', '코드', '값']);
-  const groups = groupByCategory(specs.filter((s) => !s.is_hidden));
+  // 사양 데이터 (영업직원은 영문 코드만 남는 행 제외)
+  applyHeaderRow(ws, canViewCodes ? ['항목', '코드', '값'] : ['항목', '값']);
+  const visibleSpecs = specs.filter(
+    (s) => !s.is_hidden && (canViewCodes || rowVisibleForSales(s, dict, language))
+  );
+  const groups = groupByCategory(visibleSpecs);
   groups.forEach(({ category, items }) => {
     applyCategoryRow(ws, category, colCount);
     items.forEach((spec, i) => {
-      const translated = resolveValue(spec, dict, language);
-      applyDataRow(ws, [spec.label_ko || spec.spec_key, spec.spec_value, translated], { even: i % 2 === 0 });
+      const translated = resolveValue(spec, dict, language, canViewCodes);
+      const label = resolveLabel(spec.label_ko, spec.spec_key, canViewCodes);
+      const vals = canViewCodes ? [label, spec.spec_value, translated] : [label, translated];
+      applyDataRow(ws, vals, { even: i % 2 === 0 });
     });
   });
 
@@ -191,9 +195,12 @@ export async function exportDetailToExcel(model, specs, dict, notes = [], langua
 //  사양 상세 — PDF (브라우저 인쇄)
 // ═══════════════════════════════════════════════════════════════
 
-export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko') {
+export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko', canViewCodes = true) {
   const title = `${modelFullName(model)} (${model.model_year})`;
-  const groups = groupByCategory(specs.filter((s) => !s.is_hidden));
+  const visibleSpecs = specs.filter(
+    (s) => !s.is_hidden && (canViewCodes || rowVisibleForSales(s, dict, language))
+  );
+  const groups = groupByCategory(visibleSpecs);
 
   let notesHtml = '';
   if (notes.length > 0) {
@@ -211,13 +218,13 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
   const specsHtml = groups.map(({ category, items }) => `
     <div class="category">${esc(category)}</div>
     <table>
-      <thead><tr><th style="width:35%">항목</th><th style="width:20%">코드</th><th>값</th></tr></thead>
+      <thead><tr><th style="width:35%">항목</th>${canViewCodes ? '<th style="width:20%">코드</th>' : ''}<th>값</th></tr></thead>
       <tbody>
         ${items.map((spec, i) => `
           <tr class="${i % 2 === 0 ? 'even' : ''}">
-            <td>${esc(spec.label_ko || spec.spec_key)}</td>
-            <td class="code">${esc(spec.spec_value)}</td>
-            <td>${esc(resolveValue(spec, dict, language))}</td>
+            <td>${esc(resolveLabel(spec.label_ko, spec.spec_key, canViewCodes))}</td>
+            ${canViewCodes ? `<td class="code">${esc(spec.spec_value)}</td>` : ''}
+            <td>${esc(resolveValue(spec, dict, language, canViewCodes))}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -231,9 +238,9 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
 //  비교 — Excel
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}, showDiffOnly = false, language = 'ko') {
+export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}, showDiffOnly = false, language = 'ko', canViewCodes = true) {
   const allKeys = buildAllKeys(models, specsMap, dict);
-  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, language) : null;
+  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, language, canViewCodes) : null;
 
   const wb = new ExcelJS.Workbook();
   const sheetName = `비교_${models.map((m) => m.code).join('_')}`.slice(0, 31);
@@ -285,14 +292,17 @@ export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}
       const specs = specsMap[m.id] ?? [];
       const spec = specs.find((s) => s.spec_key === row.spec_key);
       if (!spec) return '—';
-      return resolveValue(spec, dict, language);
+      return resolveValue(spec, dict, language, canViewCodes);
     });
+
+    // 영업직원: 라벨도 없고 값도 전부 비면 영문 코드뿐이던 행 → 건너뜀
+    if (!canViewCodes && !row.labelKo && values.every((v) => !v || v === '—')) return;
 
     const uniqueVals = new Set(values.filter((v) => v !== '—'));
     const hasAbsent = values.some((v) => v === '—');
     const isDiff = uniqueVals.size > 1 || (hasAbsent && uniqueVals.size > 0);
 
-    applyDataRow(ws, [row.labelKo || row.spec_key, ...values], {
+    applyDataRow(ws, [resolveLabel(row.labelKo, row.spec_key, canViewCodes), ...values], {
       highlight: isDiff,
       even: rowIndex % 2 === 0,
     });
@@ -308,9 +318,9 @@ export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}
 //  비교 — PDF (브라우저 인쇄)
 // ═══════════════════════════════════════════════════════════════
 
-export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDiffOnly = false, language = 'ko') {
+export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDiffOnly = false, language = 'ko', canViewCodes = true) {
   const allKeys = buildAllKeys(models, specsMap, dict);
-  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, language) : null;
+  const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, language, canViewCodes) : null;
 
   const title = `모델 비교: ${models.map((m) => modelFullName(m)).join(' vs ')}`;
   const modelHeaders = models.map((m) => `<th>${esc(modelFullName(m))}<br><small>${m.model_year}</small></th>`).join('');
@@ -366,15 +376,18 @@ export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDi
       const specs = specsMap[m.id] ?? [];
       const spec = specs.find((s) => s.spec_key === row.spec_key);
       if (!spec) return '—';
-      return resolveValue(spec, dict, language);
+      return resolveValue(spec, dict, language, canViewCodes);
     });
+
+    // 영업직원: 라벨도 없고 값도 전부 비면 영문 코드뿐이던 행 → 건너뜀
+    if (!canViewCodes && !row.labelKo && values.every((v) => !v || v === '—')) return;
 
     const uniqueVals = new Set(values.filter((v) => v !== '—'));
     const hasAbsent = values.some((v) => v === '—');
     const isDiff = uniqueVals.size > 1 || (hasAbsent && uniqueVals.size > 0);
 
     const cells = values.map((v) => `<td>${esc(v)}</td>`).join('');
-    tableRows += `<tr class="${isDiff ? 'diff' : ''} ${rowIdx % 2 === 0 ? 'even' : ''}"><td>${esc(row.labelKo || row.spec_key)}</td>${cells}</tr>`;
+    tableRows += `<tr class="${isDiff ? 'diff' : ''} ${rowIdx % 2 === 0 ? 'even' : ''}"><td>${esc(resolveLabel(row.labelKo, row.spec_key, canViewCodes))}</td>${cells}</tr>`;
     rowIdx++;
   });
   flushTable();
@@ -521,12 +534,26 @@ function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function resolveValue(spec, dict, language = 'ko') {
+// 사양값 → 표시 문자열.
+// canViewCodes=false(영업직원)는 번역이 없을 때 영문 코드로 폴백하지 않고 ''.
+function resolveValue(spec, dict, language = 'ko', canViewCodes = true) {
   if (!spec.use_translate) return spec.spec_value || '';
   const entry = dict[(spec.spec_value || '').trim().toUpperCase()];
-  if (language === 'en') return (entry?.name_en) || spec.spec_value || '';
-  if (!entry) return spec.spec_value || '';
-  return entry.name_ko || spec.spec_value;
+  if (language === 'en') return entry?.name_en || (canViewCodes ? spec.spec_value || '' : '');
+  if (!entry) return canViewCodes ? spec.spec_value || '' : '';
+  return entry.name_ko || (canViewCodes ? spec.spec_value : '') || '';
+}
+
+// 항목명: 국문 라벨 우선, 없으면 admin/staff 는 영문 코드, 영업직원은 ''.
+function resolveLabel(labelKo, specKey, canViewCodes = true) {
+  return labelKo || (canViewCodes ? specKey || '' : '');
+}
+
+// 영업직원에게 보여줄 내용이 있는 행인지 (라벨도 번역값도 없으면 영문 코드뿐 → 숨김)
+function rowVisibleForSales(spec, dict, language = 'ko') {
+  if (dict[(spec.spec_value || '').trim().toUpperCase()]?.is_hidden) return false;
+  if (spec.label_ko) return true;
+  return !!resolveValue(spec, dict, language, false);
 }
 
 function sanitizeFilename(name) {
@@ -570,7 +597,7 @@ function buildAllKeys(models, specsMap, dict) {
   return result;
 }
 
-function buildDiffSet(allKeys, models, specsMap, dict, language = 'ko') {
+function buildDiffSet(allKeys, models, specsMap, dict, language = 'ko', canViewCodes = true) {
   const specKeys = new Set();
   const categories = new Set();
   allKeys.forEach((row) => {
@@ -579,7 +606,7 @@ function buildDiffSet(allKeys, models, specsMap, dict, language = 'ko') {
       const specs = specsMap[m.id] ?? [];
       const spec = specs.find((s) => s.spec_key === row.spec_key);
       if (!spec) return null;
-      return resolveValue(spec, dict, language);
+      return resolveValue(spec, dict, language, canViewCodes);
     });
     const unique = new Set(vals.filter(Boolean));
     const hasAbsent = vals.some((v) => v === null);

@@ -13,7 +13,7 @@ import { exportDetailToExcel, exportDetailToPDF } from '../lib/export';
 
 export default function ModelDetail() {
   const { id } = useParams();
-  const { isAdmin } = useAuth();
+  const { isAdmin, canViewCodes } = useAuth();
   const { model, specs: initialSpecs, notes, loading, error } = useModelDetail(id);
   const { codeIndex: dict, setSpecHidden } = useData();
   const [specs, setSpecs] = useState([]);
@@ -104,14 +104,14 @@ export default function ModelDetail() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportDetailToExcel(model, specs, dict, notes, lang)}
+              onClick={() => exportDetailToExcel(model, specs, dict, notes, lang, canViewCodes)}
             >
               Excel
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportDetailToPDF(model, specs, dict, notes, lang)}
+              onClick={() => exportDetailToPDF(model, specs, dict, notes, lang, canViewCodes)}
             >
               PDF
             </Button>

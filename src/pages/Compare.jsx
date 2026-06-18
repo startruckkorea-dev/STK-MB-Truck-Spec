@@ -5,6 +5,7 @@ import CompareTable from '../components/CompareTable';
 import Button from '../components/ui/Button';
 import { useSpecLang } from '../hooks/useSpecLang';
 import { useData } from '../contexts/DataContext';
+import { useAuth } from '../hooks/useAuth';
 import { exportCompareToExcel, exportCompareToPDF } from '../lib/export';
 
 export default function Compare() {
@@ -13,6 +14,7 @@ export default function Compare() {
   const idCount = idsKey ? idsKey.split(',').length : 0;
 
   const { models: allModels, specs: allSpecs, modelNotes, codeIndex, loading, error } = useData();
+  const { canViewCodes } = useAuth();
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [lang] = useSpecLang();
 
@@ -87,7 +89,7 @@ export default function Compare() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly, lang)}
+            onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly, lang, canViewCodes)}
             disabled={loading || models.length === 0}
           >
             Excel
@@ -95,7 +97,7 @@ export default function Compare() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly, lang)}
+            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly, lang, canViewCodes)}
             disabled={loading || models.length === 0}
           >
             PDF
