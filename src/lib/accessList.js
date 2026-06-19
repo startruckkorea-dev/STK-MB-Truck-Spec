@@ -28,15 +28,19 @@ const ROLE_COL = 7; // H
 
 const VALID_ROLES = new Set(['admin', 'staff', 'sales']);
 
-/** H 컬럼 값 → 역할 키. 영문/한글/기타 표기를 허용, 미인식 시 'sales'. */
+/**
+ * H 컬럼 값 → 역할 키(admin/staff/sales). 영문/한글 표기를 허용한다.
+ * 빈칸이거나 인식할 수 없는 값이면 null 을 반환한다 — "권한 미부여"로 취급하여
+ * 임의로 sales 를 부여하지 않는다(빈칸을 영업직원으로 오인하지 않도록).
+ */
 export function normalizeRole(raw) {
   const v = String(raw ?? '').trim().toLowerCase();
-  if (!v) return 'sales';
+  if (!v) return null;
   if (VALID_ROLES.has(v)) return v;
   if (/(admin|관리자)/.test(v)) return 'admin';
   if (/(staff|본사)/.test(v)) return 'staff';
   if (/(sales|영업)/.test(v)) return 'sales';
-  return 'sales';
+  return null;
 }
 
 // ─── 파일(워크북) 위치 해석 — 1회 캐시 ───────────────────────────────

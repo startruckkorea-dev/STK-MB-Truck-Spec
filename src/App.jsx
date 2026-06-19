@@ -34,7 +34,7 @@ function FullPageLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="flex flex-col items-center gap-3">
-        <img src="/MB_Star_Logo_black.png" alt="MB" className="h-10 w-auto animate-pulse" />
+        <img src="/mb-trucks-logo.png" alt="Mercedes-Benz Trucks" className="h-10 w-auto animate-pulse" />
         <p className="text-gray-400 text-sm">로딩 중...</p>
       </div>
     </div>

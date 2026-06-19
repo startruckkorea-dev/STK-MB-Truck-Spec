@@ -80,8 +80,8 @@ export function AuthProvider({ children }) {
         if (cancelled) return;
         const match = access.find((a) => a.email === email);
         const hasAdmin = access.some((a) => a.role === 'admin');
-        if (match) {
-          setRole(match.role); // 이미 admin/staff/sales 로 정규화됨
+        if (match && match.role) {
+          setRole(match.role); // admin/staff/sales (빈칸/미인식은 role=null 이라 제외)
           setAccessStatus('ok');
         } else if (!hasAdmin) {
           setRole('admin'); // 부트스트랩(목록에 admin 부재) — 락아웃 방지
