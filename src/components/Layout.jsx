@@ -11,7 +11,7 @@ const ROLE_BADGE_CLS = {
 };
 
 export default function Layout({ children }) {
-  const { profile, isAdmin, signOut } = useAuth();
+  const { profile, isAdmin, isBootstrap, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -203,6 +203,22 @@ export default function Layout({ children }) {
           </div>
         )}
       </header>
+
+      {/* ── 부트스트랩 경고 (접근권한 목록이 비어 임시 관리자일 때) ── */}
+      {isBootstrap && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 flex items-start gap-2">
+            <svg className="w-4 h-4 mt-0.5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              접근권한 목록(<span className="font-semibold">Access_List</span>)이 비어 있어
+              임시로 <span className="font-semibold">관리자</span> 권한이 부여되었습니다.
+              SharePoint <span className="font-semibold">Access</span> 폴더의 권한 파일(G=이메일, H=권한)을 설정해 주세요.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── 본문 ── */}
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">

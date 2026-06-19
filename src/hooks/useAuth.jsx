@@ -19,7 +19,15 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [msAccount, setMsAccount] = useState(null);
   const [msalReady, setMsalReady] = useState(false);
-  const [role, setRole] = useState(null); // null = 아직 미확정
+  const [role, setRole] = useState(null); // null = 아직 미확정 또는 권한 없음
+  // 접근권한 목록 조회 결과 상태
+  //   null         = 아직 확정 안 됨(로딩)
+  //   'ok'         = 목록에 등록된 사용자 → role 부여
+  //   'bootstrap'  = 목록이 비어 admin 부재 → 임시 admin (경고 표시)
+  //   'unregistered' = 목록엔 있으나 본인 미등록 → 콘텐츠 차단
+  //   'error'      = 목록 파일을 못 읽음 → 콘텐츠 차단
+  const [accessStatus, setAccessStatus] = useState(null);
+  const [recheckTick, setRecheckTick] = useState(0);
 
   // ─── MSAL 초기화 + 이벤트 구독 ─────────────────────────────────
   useEffect(() => {
@@ -48,6 +56,7 @@ export function AuthProvider({ children }) {
           case EventType.ACCOUNT_REMOVED:
             setMsAccount(null);
             setRole(null);
+            setAccessStatus(null);
             break;
           default:
             break;
@@ -60,8 +69,10 @@ export function AuthProvider({ children }) {
 
   // ─── 역할 결정: Access List(.xlsx) 조회 ─────────────────────────
   useEffect(() => {
-    if (!msAccount) { setRole(null); return; }
+    if (!msAccount) { setRole(null); setAccessStatus(null); return; }
     let cancelled = false;
+    setRole(null);
+    setAccessStatus(null); // 재조회 시 로딩 상태로
     (async () => {
       const email = String(msAccount.username || '').trim().toLowerCase();
       try {
@@ -69,16 +80,26 @@ export function AuthProvider({ children }) {
         if (cancelled) return;
         const match = access.find((a) => a.email === email);
         const hasAdmin = access.some((a) => a.role === 'admin');
-        if (match) setRole(match.role); // 이미 admin/staff/sales 로 정규화됨
-        else if (!hasAdmin) setRole('admin'); // 부트스트랩(목록에 admin 부재)
-        else setRole('sales'); // 미등록 사용자는 최소 권한
+        if (match) {
+          setRole(match.role); // 이미 admin/staff/sales 로 정규화됨
+          setAccessStatus('ok');
+        } else if (!hasAdmin) {
+          setRole('admin'); // 부트스트랩(목록에 admin 부재) — 락아웃 방지
+          setAccessStatus('bootstrap');
+        } else {
+          setRole(null); // 미등록 사용자 → 권한 없음(콘텐츠 차단)
+          setAccessStatus('unregistered');
+        }
       } catch {
-        // 목록을 못 읽으면 최소 권한(sales)로
-        if (!cancelled) setRole('sales');
+        // 목록 파일을 못 읽음 → 권한 없음(콘텐츠 차단)
+        if (!cancelled) { setRole(null); setAccessStatus('error'); }
       }
     })();
     return () => { cancelled = true; };
-  }, [msAccount]);
+  }, [msAccount, recheckTick]);
+
+  // 접근권한 목록을 다시 조회 (읽기 실패 후 재시도 버튼용)
+  const recheckAccess = () => setRecheckTick((n) => n + 1);
 
   async function signOut() {
     try {
@@ -88,8 +109,8 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // 로그인 안 했으면 MSAL 준비 후 바로, 로그인 했으면 역할 확정까지 대기
-  const loading = !msalReady || (!!msAccount && role === null);
+  // 로그인 안 했으면 MSAL 준비 후 바로, 로그인 했으면 권한 상태 확정까지 대기
+  const loading = !msalReady || (!!msAccount && accessStatus === null);
 
   const { user, profile } = useMemo(() => {
     if (!msAccount) return { user: null, profile: null };
@@ -99,17 +120,33 @@ export function AuthProvider({ children }) {
       name: msAccount.name || msAccount.username,
       provider: 'microsoft',
     };
-    return { user: u, profile: { ...u, role: role || 'sales' } };
+    return { user: u, profile: { ...u, role } };
   }, [msAccount, role]);
 
   const isAdmin = profile?.role === 'admin';
   const isStaff = profile?.role === 'staff';
   const isSales = profile?.role === 'sales';
   const canViewCodes = isAdmin || isStaff;
+  // 콘텐츠를 막아야 하는 상태 (읽기 실패 / 미등록 사용자)
+  const accessDenied = accessStatus === 'error' || accessStatus === 'unregistered';
+  const isBootstrap = accessStatus === 'bootstrap';
 
   return (
     <AuthContext.Provider
-      value={{ user, profile, loading, signOut, isAdmin, isStaff, isSales, canViewCodes }}
+      value={{
+        user,
+        profile,
+        loading,
+        signOut,
+        isAdmin,
+        isStaff,
+        isSales,
+        canViewCodes,
+        accessStatus,
+        accessDenied,
+        isBootstrap,
+        recheckAccess,
+      }}
     >
       {children}
     </AuthContext.Provider>

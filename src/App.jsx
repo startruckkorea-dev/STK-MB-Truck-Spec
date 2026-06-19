@@ -9,19 +9,23 @@ import Compare from './pages/Compare';
 import AdminModels from './pages/admin/AdminModels';
 import AdminModelEdit from './pages/admin/AdminModelEdit';
 import AdminDict from './pages/admin/AdminDict';
+import AccessNotice from './components/AccessNotice';
 
 // ─── 라우트 가드 ──────────────────────────────────────────────
 function RequireAuth({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, accessDenied } = useAuth();
   if (loading) return <FullPageLoader />;
   if (!user) return <Navigate to="/login" replace />;
+  // 읽기 실패·미등록 사용자는 콘텐츠 대신 안내 화면만 표시
+  if (accessDenied) return <AccessNotice />;
   return children;
 }
 
 function RequireAdmin({ children }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, accessDenied } = useAuth();
   if (loading) return <FullPageLoader />;
   if (!user) return <Navigate to="/login" replace />;
+  if (accessDenied) return <AccessNotice />;
   if (profile && profile.role !== 'admin') return <Navigate to="/models" replace />;
   return children;
 }
