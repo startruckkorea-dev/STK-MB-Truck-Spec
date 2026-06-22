@@ -3,15 +3,23 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import LangToggle from './ui/LangToggle';
 
-const ROLE_LABEL = { admin: '관리자', staff: '본사직원', sales: '영업직원' };
+const ROLE_LABEL = {
+  admin: '관리자',
+  'staff-a': '본사직원A',
+  'staff-b': '본사직원B',
+  staff: '본사직원', // 구버전 호환
+  sales: '영업직원',
+};
 const ROLE_BADGE_CLS = {
   admin: 'bg-mb-blue text-white',
+  'staff-a': 'bg-green-100 text-green-700',
+  'staff-b': 'bg-green-100 text-green-700',
   staff: 'bg-green-100 text-green-700',
   sales: 'bg-gray-100 text-gray-600',
 };
 
 export default function Layout({ children }) {
-  const { profile, isAdmin, isBootstrap, signOut } = useAuth();
+  const { profile, isAdmin, canViewDict, isBootstrap, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -53,32 +61,32 @@ export default function Layout({ children }) {
                 모델 목록
               </NavLink>
               {isAdmin && (
-                <>
-                  <NavLink
-                    to="/admin/models"
-                    className={({ isActive }) =>
-                      `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-mb-blue text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`
-                    }
-                  >
-                    모델 관리
-                  </NavLink>
-                  <NavLink
-                    to="/admin/dict"
-                    className={({ isActive }) =>
-                      `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-mb-blue text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`
-                    }
-                  >
-                    코드 사전
-                  </NavLink>
-                </>
+                <NavLink
+                  to="/admin/models"
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-mb-blue text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`
+                  }
+                >
+                  모델 관리
+                </NavLink>
+              )}
+              {canViewDict && (
+                <NavLink
+                  to="/admin/dict"
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-mb-blue text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`
+                  }
+                >
+                  코드 사전
+                </NavLink>
               )}
             </nav>
 
@@ -145,34 +153,34 @@ export default function Layout({ children }) {
                 모델 목록
               </NavLink>
               {isAdmin && (
-                <>
-                  <NavLink
-                    to="/admin/models"
-                    onClick={() => setMenuOpen(false)}
-                    className={({ isActive }) =>
-                      `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-mb-blue text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`
-                    }
-                  >
-                    모델 관리
-                  </NavLink>
-                  <NavLink
-                    to="/admin/dict"
-                    onClick={() => setMenuOpen(false)}
-                    className={({ isActive }) =>
-                      `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-mb-blue text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`
-                    }
-                  >
-                    코드 사전
-                  </NavLink>
-                </>
+                <NavLink
+                  to="/admin/models"
+                  onClick={() => setMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-mb-blue text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`
+                  }
+                >
+                  모델 관리
+                </NavLink>
+              )}
+              {canViewDict && (
+                <NavLink
+                  to="/admin/dict"
+                  onClick={() => setMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-mb-blue text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`
+                  }
+                >
+                  코드 사전
+                </NavLink>
               )}
               <div className="border-t border-gray-100 pt-2 mt-1">
                 <div className="px-3 py-2">

@@ -124,9 +124,20 @@ export function AuthProvider({ children }) {
   }, [msAccount, role]);
 
   const isAdmin = profile?.role === 'admin';
-  const isStaff = profile?.role === 'staff';
+  const isStaffA = profile?.role === 'staff-a'; // 본사직원A (강화) — 숨김모델·코드사전 열람
+  const isStaffB = profile?.role === 'staff-b'; // 본사직원B (기존 staff 동급)
+  const isStaff = isStaffA || isStaffB;
   const isSales = profile?.role === 'sales';
-  const canViewCodes = isAdmin || isStaff;
+  // 영문 코드 열람: admin + 본사직원 A/B
+  const canViewCodes = isAdmin || isStaffA || isStaffB;
+  // 숨김(is_visible=false) 모델 열람: admin + 본사직원A
+  const canViewHidden = isAdmin || isStaffA;
+  // 코드 사전 페이지 열람: admin + 본사직원A (A는 읽기 전용)
+  const canViewDict = isAdmin || isStaffA;
+  // 코드 사전 편집/삭제/엑셀열기/다시불러오기: admin 전용
+  const canEditDict = isAdmin;
+  // 모델 관리(등록/수정): admin 전용
+  const canManageModels = isAdmin;
   // 콘텐츠를 막아야 하는 상태 (읽기 실패 / 미등록 사용자)
   const accessDenied = accessStatus === 'error' || accessStatus === 'unregistered';
   const isBootstrap = accessStatus === 'bootstrap';
@@ -140,8 +151,14 @@ export function AuthProvider({ children }) {
         signOut,
         isAdmin,
         isStaff,
+        isStaffA,
+        isStaffB,
         isSales,
         canViewCodes,
+        canViewHidden,
+        canViewDict,
+        canEditDict,
+        canManageModels,
         accessStatus,
         accessDenied,
         isBootstrap,

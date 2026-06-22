@@ -4,6 +4,7 @@ import Button from '../../components/ui/Button';
 import Toggle from '../../components/ui/Toggle';
 import ExcelImport from '../../components/admin/ExcelImport';
 import { useDict } from '../../hooks/useDict';
+import { useAuth } from '../../hooks/useAuth';
 
 const CATEGORY_OPTIONS = [
   '엔진', '변속기', '차축', '서스펜션', '타이어/휠', '캡', '외장 컬러',
@@ -37,6 +38,8 @@ export default function AdminDict() {
     categories, unregisteredCodes,
     upsertItem, deleteItem, toggleHidden, refetch,
   } = useDict();
+  // 본사직원A(canEditDict=false)는 읽기 전용 — 편집/삭제/엑셀열기/다시불러오기 불가
+  const { canEditDict } = useAuth();
 
   const [modal, setModal] = useState(null); // null | 'new' | item
   const [form, setForm] = useState(EMPTY_FORM);
@@ -103,10 +106,12 @@ export default function AdminDict() {
         </p>
       </div>
 
-      {/* 엑셀 가져오기 */}
-      <div className="mb-4 sm:mb-6">
-        <ExcelImport onImportComplete={refetch} />
-      </div>
+      {/* 엑셀 가져오기 (관리자 전용 — 엑셀열기/다시불러오기) */}
+      {canEditDict && (
+        <div className="mb-4 sm:mb-6">
+          <ExcelImport onImportComplete={refetch} />
+        </div>
+      )}
 
       {/* 탭 바 */}
       <div className="flex border border-gray-300 rounded-lg overflow-hidden mb-4 w-fit">
@@ -160,7 +165,9 @@ export default function AdminDict() {
               <option value="shown">표시</option>
               <option value="hidden">숨김</option>
             </select>
-            <Button onClick={openNew} className="flex-shrink-0 text-xs sm:text-sm">+ 등록</Button>
+            {canEditDict && (
+              <Button onClick={openNew} className="flex-shrink-0 text-xs sm:text-sm">+ 등록</Button>
+            )}
           </div>
         )}
       </div>
@@ -196,12 +203,14 @@ export default function AdminDict() {
                 <td className="px-4 py-2.5 text-center">—</td>
                 <td className="px-4 py-2.5 text-center">—</td>
                 <td className="px-4 py-2.5 text-right">
-                  <button
-                    onClick={() => openNew(code)}
-                    className="px-2 py-1 text-xs text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors"
-                  >
-                    등록
-                  </button>
+                  {canEditDict && (
+                    <button
+                      onClick={() => openNew(code)}
+                      className="px-2 py-1 text-xs text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors"
+                    >
+                      등록
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -237,28 +246,34 @@ export default function AdminDict() {
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-center">
-                  <Toggle
-                    checked={item.is_hidden}
-                    onChange={() => toggleHidden(item.id, item.is_hidden)}
-                  />
+                  {canEditDict ? (
+                    <Toggle
+                      checked={item.is_hidden}
+                      onChange={() => toggleHidden(item.id, item.is_hidden)}
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-400">{item.is_hidden ? '숨김' : '표시'}</span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <button
-                      onClick={() => openEdit(item)}
-                      className="px-2 py-1 text-xs text-mb-blue hover:bg-blue-50 rounded transition-colors"
-                    >
-                      편집
-                    </button>
-                    {mode === 'all' && (
+                  {canEditDict && (
+                    <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => handleDelete(item)}
-                        className="px-2 py-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        onClick={() => openEdit(item)}
+                        className="px-2 py-1 text-xs text-mb-blue hover:bg-blue-50 rounded transition-colors"
                       >
-                        삭제
+                        편집
                       </button>
-                    )}
-                  </div>
+                      {mode === 'all' && (
+                        <button
+                          onClick={() => handleDelete(item)}
+                          className="px-2 py-1 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </td>
               </tr>
               );
@@ -335,12 +350,14 @@ export default function AdminDict() {
               <span className="font-mono text-xs font-semibold text-amber-800">{code}</span>
               <p className="text-xs text-amber-600 mt-0.5">번역 미등록</p>
             </div>
-            <button
-              onClick={() => openNew(code)}
-              className="px-2 py-1 text-xs text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors flex-shrink-0"
-            >
-              등록
-            </button>
+            {canEditDict && (
+              <button
+                onClick={() => openNew(code)}
+                className="px-2 py-1 text-xs text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors flex-shrink-0"
+              >
+                등록
+              </button>
+            )}
           </div>
         ))}
         {loading ? (
@@ -370,22 +387,24 @@ export default function AdminDict() {
                   <div className="text-xs text-gray-400 mt-0.5">{d.engName}</div>
                 )}
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button
-                  onClick={() => openEdit(item)}
-                  className="px-2 py-1 text-xs text-mb-blue hover:bg-blue-50 rounded"
-                >
-                  편집
-                </button>
-                {mode === 'all' && (
+              {canEditDict && (
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <button
-                    onClick={() => handleDelete(item)}
-                    className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded"
+                    onClick={() => openEdit(item)}
+                    className="px-2 py-1 text-xs text-mb-blue hover:bg-blue-50 rounded"
                   >
-                    삭제
+                    편집
                   </button>
-                )}
-              </div>
+                  {mode === 'all' && (
+                    <button
+                      onClick={() => handleDelete(item)}
+                      className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded"
+                    >
+                      삭제
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           );
