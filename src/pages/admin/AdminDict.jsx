@@ -5,6 +5,7 @@ import Toggle from '../../components/ui/Toggle';
 import ExcelImport from '../../components/admin/ExcelImport';
 import { useDict } from '../../hooks/useDict';
 import { useAuth } from '../../hooks/useAuth';
+import { isShortCode } from '../../lib/codeIndex';
 
 const CATEGORY_OPTIONS = [
   '엔진', '변속기', '차축', '서스펜션', '타이어/휠', '캡', '외장 컬러',
@@ -17,10 +18,10 @@ const EMPTY_FORM = {
 
 // DB에 두 유형의 데이터가 혼재:
 // 유형 A: code=긴영문, category=짧은MB코드 (엑셀 가져오기)
-// 유형 B: code=짧은MB코드, name_en=영문설명 (모델 spec)
+// 유형 B/C: code=짧은MB코드, name_en=영문설명, category=카테고리명 (모델 spec / 코드 편집)
 function getDisplayFields(item) {
-  const cat = item.category;
-  const catIsShortCode = cat && cat.length <= 6 && !cat.includes(' ');
+  const cat = item.category || '';
+  const catIsShortCode = isShortCode(cat);
   if (catIsShortCode) {
     return { shortCode: cat, engName: item.code, category: item.name_en };
   }
