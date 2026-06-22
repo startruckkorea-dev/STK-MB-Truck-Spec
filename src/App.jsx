@@ -30,6 +30,16 @@ function RequireAdmin({ children }) {
   return children;
 }
 
+// 코드 사전: admin + 본사직원A (A는 읽기 전용). 그 외는 모델 목록으로.
+function RequireDict({ children }) {
+  const { user, loading, accessDenied, canViewDict } = useAuth();
+  if (loading) return <FullPageLoader />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (accessDenied) return <AccessNotice />;
+  if (!canViewDict) return <Navigate to="/models" replace />;
+  return children;
+}
+
 function FullPageLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white">
@@ -57,7 +67,7 @@ export default function App() {
       <Route path="/admin/models" element={<RequireAdmin><AdminModels /></RequireAdmin>} />
       <Route path="/admin/models/new" element={<RequireAdmin><AdminModelEdit /></RequireAdmin>} />
       <Route path="/admin/models/:id/edit" element={<RequireAdmin><AdminModelEdit /></RequireAdmin>} />
-      <Route path="/admin/dict" element={<RequireAdmin><AdminDict /></RequireAdmin>} />
+      <Route path="/admin/dict" element={<RequireDict><AdminDict /></RequireDict>} />
 
       {/* 기본 리다이렉트 */}
       <Route path="/" element={<Navigate to="/models" replace />} />

@@ -5,17 +5,17 @@ import { compareModels } from '../lib/modelSort';
 
 /**
  * 모델 목록 조회 (SharePoint 캐시 기반)
- * - admin: is_visible=false 포함 전체
- * - sales/staff: is_visible=true 만
+ * - admin / 본사직원A: is_visible=false 포함 전체
+ * - 본사직원B / sales: is_visible=true 만
  */
 export function useModels() {
   const { models, loading, error, reload } = useData();
-  const { isAdmin } = useAuth();
+  const { canViewHidden } = useAuth();
 
   const sorted = useMemo(() => {
-    const list = isAdmin ? models : models.filter((m) => m.is_visible !== false);
+    const list = canViewHidden ? models : models.filter((m) => m.is_visible !== false);
     return [...list].sort(compareModels);
-  }, [models, isAdmin]);
+  }, [models, canViewHidden]);
 
   return { models: sorted, loading, error, refetch: reload };
 }
