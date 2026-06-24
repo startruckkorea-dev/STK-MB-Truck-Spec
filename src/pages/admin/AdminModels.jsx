@@ -7,6 +7,14 @@ import { useData } from '../../contexts/DataContext';
 
 const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego' };
 
+const BADGE_LABELS = {
+  new: 'NEW',
+  updated: 'UPDATED',
+  'fleet-domestic': 'Fleet내수',
+  'fleet-export': 'Fleet수출',
+  'branch-order': 'Branch주문차',
+};
+
 function SortIcon({ col, sortKey, sortDir }) {
   if (sortKey !== col)
     return <span className="ml-0.5 text-gray-300 text-xs">↕</span>;
@@ -204,6 +212,7 @@ export default function AdminModels() {
                   <th className={thClass} onClick={() => handleSort('series')}>
                     시리즈 <SortIcon col="series" sortKey={sortKey} sortDir={sortDir} />
                   </th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">배지</th>
                   <th className={`${thClass} hidden md:table-cell`} onClick={() => handleSort('model_year')}>
                     MY <SortIcon col="model_year" sortKey={sortKey} sortDir={sortDir} />
                   </th>
@@ -250,6 +259,15 @@ export default function AdminModels() {
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>{model.series}</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        {model.badge ? (
+                          <Badge variant={model.badge}>
+                            {BADGE_LABELS[model.badge] ?? model.badge}
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         <span className="font-mono text-xs text-mb-blue font-semibold">{model.model_year}</span>
@@ -340,6 +358,11 @@ export default function AdminModels() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                         <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>{model.series}</Badge>
+                        {model.badge && (
+                          <Badge variant={model.badge}>
+                            {BADGE_LABELS[model.badge] ?? model.badge}
+                          </Badge>
+                        )}
                         <span className="font-mono text-xs text-mb-blue font-semibold">{model.model_year}</span>
                         {model.production_month && (
                           <span className="font-mono text-[10px] text-gray-400">{model.production_month}</span>

@@ -13,6 +13,14 @@ const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego'];
 
 const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego' };
 
+const BADGE_LABELS = {
+  new: 'NEW',
+  updated: 'UPDATED',
+  'fleet-domestic': 'Fleet내수',
+  'fleet-export': 'Fleet수출',
+  'branch-order': 'Branch주문차',
+};
+
 const VIEW_KEY = 'models-view-mode';
 
 // 차종 정렬 우선순위
@@ -322,6 +330,7 @@ export default function Models() {
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">모델코드</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">축</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">캐빈</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">배지</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap">생산월</th>
                         <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">비교</th>
@@ -366,6 +375,15 @@ export default function Models() {
                             </td>
                             <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
                               {model.cabin || <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              {model.badge ? (
+                                <Badge variant={model.badge}>
+                                  {BADGE_LABELS[model.badge] ?? model.badge}
+                                </Badge>
+                              ) : (
+                                <span className="text-gray-300">—</span>
+                              )}
                             </td>
                             <td className="px-3 py-2.5">
                               {notes.length > 0 ? (
