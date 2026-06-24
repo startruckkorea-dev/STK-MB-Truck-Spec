@@ -1,8 +1,11 @@
 export default function Badge({ children, variant = 'default', className = '' }) {
   const variants = {
     default:   'bg-gray-100 text-gray-600',
-    new:       'bg-mb-blue text-white',
-    updated:   'bg-amber-100 text-amber-700',
+    new:             'bg-mb-blue text-white',
+    updated:         'bg-amber-100 text-amber-700',
+    'fleet-domestic': 'bg-emerald-100 text-emerald-700 border border-emerald-300',
+    'fleet-export':   'bg-cyan-100 text-cyan-700 border border-cyan-300',
+    'branch-order':   'bg-purple-100 text-purple-700 border border-purple-300',
     hidden:    'bg-gray-200 text-gray-500',
     // MY 연식별 색상 (5가지 이상)
     year28:    'bg-amber-400 text-amber-900 border border-amber-500',        // MY28+ — 골드

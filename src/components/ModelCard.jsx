@@ -4,6 +4,14 @@ import Button from './ui/Button';
 import { useAuth } from '../hooks/useAuth';
 import { useData } from '../contexts/DataContext';
 
+const BADGE_LABELS = {
+  new: 'NEW',
+  updated: 'UPDATED',
+  'fleet-domestic': 'Fleet내수',
+  'fleet-export': 'Fleet수출',
+  'branch-order': 'Branch주문차',
+};
+
 function getYearVariant(modelYear) {
   const n = parseInt(String(modelYear).replace(/\D/g, '')) || 0;
   if (n >= 28) return 'year28';
@@ -59,8 +67,8 @@ export default function ModelCard({
           )}
           <Badge variant={getYearVariant(model.model_year)}>{model.model_year}</Badge>
           {model.badge && (
-            <Badge variant={model.badge === 'new' ? 'new' : 'updated'}>
-              {model.badge === 'new' ? 'NEW' : 'update'}
+            <Badge variant={model.badge}>
+              {BADGE_LABELS[model.badge] ?? model.badge}
             </Badge>
           )}
         </div>

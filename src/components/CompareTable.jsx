@@ -2,6 +2,14 @@ import ColorSwatch from './ColorSwatch';
 import Badge from './ui/Badge';
 import { useAuth } from '../hooks/useAuth';
 
+const BADGE_LABELS = {
+  new: 'NEW',
+  updated: 'UPDATED',
+  'fleet-domestic': 'Fleet내수',
+  'fleet-export': 'Fleet수출',
+  'branch-order': 'Branch주문차',
+};
+
 
 /**
  * 비교 테이블
@@ -34,8 +42,8 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
                     {m.name_ko && <Badge variant="default">{m.name_ko}</Badge>}
                     <Badge variant="year">{m.model_year}</Badge>
                     {m.badge && (
-                      <Badge variant={m.badge === 'new' ? 'new' : 'updated'}>
-                        {m.badge === 'new' ? 'NEW' : 'update'}
+                      <Badge variant={m.badge}>
+                        {BADGE_LABELS[m.badge] ?? m.badge}
                       </Badge>
                     )}
                   </div>

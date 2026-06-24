@@ -414,6 +414,9 @@ export default function AdminModelEdit() {
                 <option value="">없음</option>
                 <option value="new">NEW</option>
                 <option value="updated">UPDATED</option>
+                <option value="fleet-domestic">Fleet내수</option>
+                <option value="fleet-export">Fleet수출</option>
+                <option value="branch-order">Branch주문차</option>
               </select>
             </div>
 
