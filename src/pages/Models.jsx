@@ -58,9 +58,16 @@ export default function Models() {
   const [search, setSearch] = useState('');
   const [compareList, setCompareList] = useState([]);
   const [reordering, setReordering] = useState(false);
-  const [viewMode, setViewMode] = useState(
-    () => localStorage.getItem(VIEW_KEY) || 'list'
-  );
+  const [viewMode, setViewMode] = useState(() => {
+    // 사용자가 직접 고른 값이 있으면 그대로, 없으면 기기 기준 기본값
+    const saved = localStorage.getItem(VIEW_KEY);
+    if (saved === 'list' || saved === 'tile') return saved;
+    // PC(≥640px) → 리스트형, 모바일 → 타일형
+    const isDesktop =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(min-width: 640px)').matches;
+    return isDesktop ? 'list' : 'tile';
+  });
 
   function changeView(mode) {
     setViewMode(mode);
