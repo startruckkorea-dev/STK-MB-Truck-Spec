@@ -17,6 +17,9 @@ export default function Compare() {
   const { canViewCodes } = useAuth();
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [lang] = useSpecLang();
+  // 코드 열람 권한이 있어도 외부 배포용으로 코드를 숨겨 출력하는 옵션
+  const [hideCodesExport, setHideCodesExport] = useState(false);
+  const exportCodes = canViewCodes && !hideCodesExport;
 
   // 캐시에서 선택 모델 + 사양 + 노트 구성 (id 순서 유지)
   const { models, specsMap, notesMap } = useMemo(() => {
@@ -85,11 +88,22 @@ export default function Compare() {
             </button>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          {canViewCodes && (
+            <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none mr-1">
+              <input
+                type="checkbox"
+                checked={hideCodesExport}
+                onChange={(e) => setHideCodesExport(e.target.checked)}
+                className="accent-mb-blue"
+              />
+              코드숨김 출력
+            </label>
+          )}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly, lang, canViewCodes)}
+            onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes)}
             disabled={loading || models.length === 0}
           >
             Excel
@@ -97,7 +111,7 @@ export default function Compare() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly, lang, canViewCodes)}
+            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes)}
             disabled={loading || models.length === 0}
           >
             PDF

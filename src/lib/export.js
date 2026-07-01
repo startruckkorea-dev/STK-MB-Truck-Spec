@@ -238,7 +238,8 @@ export async function exportDetailToExcel(model, specs, dict, notes = [], langua
     items.forEach((spec, i) => {
       const translated = resolveValue(spec, dict, language, canViewCodes);
       const label = resolveLabel(spec.label_ko, spec.spec_key, canViewCodes);
-      const vals = canViewCodes ? [label, spec.spec_value, translated] : [label, translated];
+      const code = codeCell(spec.spec_value, label, translated);
+      const vals = canViewCodes ? [label, code, translated] : [label, translated];
       applyDataRow(ws, vals, { even: i % 2 === 0 });
     });
   });
@@ -280,13 +281,18 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
     <table>
       <colgroup>${specColgroup}</colgroup>
       <tbody>
-        ${items.map((spec, i) => `
+        ${items.map((spec, i) => {
+          const label = resolveLabel(spec.label_ko, spec.spec_key, canViewCodes);
+          const translated = resolveValue(spec, dict, language, canViewCodes);
+          const code = codeCell(spec.spec_value, label, translated);
+          return `
           <tr class="${i % 2 === 0 ? 'even' : ''}">
-            <td>${esc(resolveLabel(spec.label_ko, spec.spec_key, canViewCodes))}</td>
-            ${canViewCodes ? `<td class="code">${esc(spec.spec_value)}</td>` : ''}
-            <td>${esc(resolveValue(spec, dict, language, canViewCodes))}</td>
+            <td>${esc(label)}</td>
+            ${canViewCodes ? `<td class="code">${esc(code)}</td>` : ''}
+            <td>${esc(translated)}</td>
           </tr>
-        `).join('')}
+        `;
+        }).join('')}
       </tbody>
     </table>
   `).join('');
@@ -622,6 +628,14 @@ function resolveValue(spec, dict, language = 'ko', canViewCodes = true) {
 // 항목명: 국문 라벨 우선, 없으면 admin/staff 는 영문 코드, 영업직원은 ''.
 function resolveLabel(labelKo, specKey, canViewCodes = true) {
   return labelKo || (canViewCodes ? specKey || '' : '');
+}
+
+// 가운데 "코드" 칸 값. 번역이 없어 값 칸이 코드로 폴백됐거나 항목명이 이미
+// 같은 코드일 때는 코드가 중복 표시되므로 가운데 칸을 비운다.
+function codeCell(specValue, label, translated) {
+  const code = specValue || '';
+  if (code && (code === translated || code === label)) return '';
+  return code;
 }
 
 // 영업직원에게 보여줄 내용이 있는 행인지 (라벨도 번역값도 없으면 영문 코드뿐 → 숨김)

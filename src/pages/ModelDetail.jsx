@@ -18,6 +18,9 @@ export default function ModelDetail() {
   const { codeIndex: dict, setSpecHidden } = useData();
   const [specs, setSpecs] = useState([]);
   const [lang] = useSpecLang();
+  // 코드 열람 권한이 있어도 외부 배포용으로 코드를 숨겨 출력하는 옵션
+  const [hideCodesExport, setHideCodesExport] = useState(false);
+  const exportCodes = canViewCodes && !hideCodesExport;
 
   // initialSpecs(캐시)가 갱신되면 로컬 상태로 동기화
   useEffect(() => {
@@ -101,17 +104,28 @@ export default function ModelDetail() {
             )}
           </div>
           <div className="flex gap-2 flex-shrink-0 flex-wrap items-center">
+            {canViewCodes && (
+              <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none mr-1">
+                <input
+                  type="checkbox"
+                  checked={hideCodesExport}
+                  onChange={(e) => setHideCodesExport(e.target.checked)}
+                  className="accent-mb-blue"
+                />
+                코드숨김 출력
+              </label>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportDetailToExcel(model, specs, dict, notes, lang, canViewCodes)}
+              onClick={() => exportDetailToExcel(model, specs, dict, notes, lang, exportCodes)}
             >
               Excel
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportDetailToPDF(model, specs, dict, notes, lang, canViewCodes)}
+              onClick={() => exportDetailToPDF(model, specs, dict, notes, lang, exportCodes)}
             >
               PDF
             </Button>
