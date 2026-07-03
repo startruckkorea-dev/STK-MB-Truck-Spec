@@ -27,9 +27,14 @@ export default function ModelCard({
   model,
   isSelected,
   onCompareToggle,
-  onMoveLeft,
-  onMoveRight,
   reordering = false,
+  draggable = false,
+  isDragging = false,
+  isDropTarget = false,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }) {
   const { isAdmin } = useAuth();
   const { setModelVisible } = useData();
@@ -46,11 +51,16 @@ export default function ModelCard({
 
   return (
     <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
       className={`relative rounded-xl border bg-white shadow-sm transition-all ${
         isHidden
           ? 'opacity-50 border-gray-200'
           : 'border-gray-200 hover:shadow-md hover:border-mb-blue/30'
-      }`}
+      } ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'ring-2 ring-mb-blue' : ''}`}
     >
       {/* 숨김 배지 (admin 전용) */}
       {isAdmin && isHidden && (
@@ -107,28 +117,17 @@ export default function ModelCard({
           </Button>
         </div>
 
-        {/* admin 전용: 순서 이동 + 공개/숨기기 토글 */}
+        {/* admin 전용: 드래그 순서 이동 핸들 + 공개/숨기기 토글 */}
         {isAdmin && (
           <div className="mt-2 sm:mt-3 flex items-center justify-between gap-2">
-            {/* 순서 이동 (그룹 내 좌/우) */}
-            <div className="flex items-center gap-0.5">
-              <button
-                onClick={onMoveLeft}
-                disabled={!onMoveLeft || reordering}
-                title="왼쪽으로 이동"
-                className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-              >
-                ←
-              </button>
-              <button
-                onClick={onMoveRight}
-                disabled={!onMoveRight || reordering}
-                title="오른쪽으로 이동"
-                className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-              >
-                →
-              </button>
-            </div>
+            <span
+              title="드래그해서 순서 이동"
+              className={`inline-flex items-center gap-1 text-xs text-gray-400 select-none ${
+                reordering ? 'opacity-40' : 'cursor-grab hover:text-gray-700'
+              }`}
+            >
+              <span className="text-sm leading-none">⠿</span> 이동
+            </span>
             <button
               onClick={toggleVisibility}
               className="flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors py-1"

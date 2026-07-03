@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 
 // 페이지
@@ -40,6 +41,16 @@ function RequireDict({ children }) {
   return children;
 }
 
+// 라우트(경로) 변경 시 항상 페이지 최상단으로 스크롤을 리셋한다.
+// (모델 목록에서 스크롤을 내린 상태로 상세로 이동하면 중간부터 보이던 문제 해결)
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 function FullPageLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white">
@@ -54,7 +65,9 @@ function FullPageLoader() {
 // ─── 앱 라우팅 ────────────────────────────────────────────────
 export default function App() {
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       {/* 비인증 */}
       <Route path="/login" element={<Login />} />
 
@@ -72,6 +85,7 @@ export default function App() {
       {/* 기본 리다이렉트 */}
       <Route path="/" element={<Navigate to="/models" replace />} />
       <Route path="*" element={<Navigate to="/models" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

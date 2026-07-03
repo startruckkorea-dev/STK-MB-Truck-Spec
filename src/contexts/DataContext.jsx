@@ -183,6 +183,31 @@ export function DataProvider({ children }) {
     setState((st) => ({ ...st, models: renumbered }));
   }
 
+  /**
+   * 드래그로 여러 모델의 표시 순서를 한 번에 재배치한다.
+   * orderedIds: 재배치할 모델 id 들의 "새 상대 순서" (보통 한 그룹의 행들).
+   * 이 id 들이 현재 화면 순서(compareModels)에서 차지하던 위치(slot)는 그대로 두고,
+   * 그 slot 들에 orderedIds 를 새 순서대로 다시 채운 뒤 전체 sort_order 를 0,1,2…
+   * 로 재부여해 저장한다. (그룹 밖 모델의 위치는 보존된다)
+   */
+  async function reorderModels(orderedIds) {
+    const s = stateRef.current;
+    const ids = orderedIds.map(Number);
+    const ordered = [...s.models].sort(compareModels);
+    const idSet = new Set(ids);
+    const byId = new Map(ordered.map((m) => [Number(m.id), m]));
+    // 이 id 들이 차지하던 slot(전역 순서 인덱스) 수집
+    const slots = [];
+    ordered.forEach((m, i) => { if (idSet.has(Number(m.id))) slots.push(i); });
+    if (slots.length !== ids.length) return; // 일부 id 를 못 찾음 → 무시
+    // slot 에 새 순서대로 배치
+    const result = [...ordered];
+    ids.forEach((id, k) => { result[slots[k]] = byId.get(id); });
+    const renumbered = result.map((m, i) => ({ ...m, sort_order: i }));
+    await wb.overwriteSheet('models', renumbered);
+    setState((st) => ({ ...st, models: renumbered }));
+  }
+
   async function setSpecHidden(specId, hidden) {
     const s = stateRef.current;
     const idx = s.specs.findIndex((x) => sameId(x.id, specId));
@@ -211,6 +236,7 @@ export function DataProvider({ children }) {
     deleteModel,
     setModelVisible,
     moveModelOrder,
+    reorderModels,
     setSpecHidden,
   };
 

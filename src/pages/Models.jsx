@@ -52,7 +52,7 @@ function sortBodyTypes(types) {
 
 export default function Models() {
   const { models, loading, error } = useModels();
-  const { moveModelOrder, modelNotes, setModelVisible } = useData();
+  const { reorderModels, modelNotes, setModelVisible } = useData();
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -61,6 +61,9 @@ export default function Models() {
   const [search, setSearch] = useState('');
   const [compareList, setCompareList] = useState([]);
   const [reordering, setReordering] = useState(false);
+  // 드래그 재정렬 상태
+  const [dragId, setDragId] = useState(null);   // 끌고 있는 모델 id
+  const [overId, setOverId] = useState(null);   // 드롭 대상으로 지나는 모델 id
   const [viewMode, setViewMode] = useState(() => {
     // 사용자가 직접 고른 값이 있으면 그대로, 없으면 기기 기준 기본값
     const saved = localStorage.getItem(VIEW_KEY);
@@ -155,16 +158,44 @@ export default function Models() {
     setCompareList((prev) => prev.filter((m) => m.id !== modelId));
   }
 
-  // 같은 그룹 내 두 모델의 표시 순서를 맞바꿈 (admin 전용)
-  async function moveModel(idA, idB) {
-    if (reordering) return;
+  // ── 드래그 재정렬 (admin 전용) ──
+  // groupIds: 드롭 대상이 속한 그룹(테이블/타일묶음)의 현재 id 순서
+  async function handleDrop(targetId, groupIds) {
+    const sourceId = dragId;
+    setOverId(null);
+    setDragId(null);
+    if (reordering || sourceId == null || Number(sourceId) === Number(targetId)) return;
+    const ids = groupIds.map(Number);
+    const from = ids.indexOf(Number(sourceId));
+    const to = ids.indexOf(Number(targetId));
+    if (from < 0 || to < 0) return; // 다른 그룹으로의 드롭은 무시
+    const next = [...ids];
+    next.splice(from, 1);
+    next.splice(to, 0, Number(sourceId));
     setReordering(true);
     try {
-      await moveModelOrder(idA, idB);
+      await reorderModels(next);
     } catch (e) {
       alert(e.message);
     }
     setReordering(false);
+  }
+
+  function handleDragStart(e, id) {
+    if (!isAdmin) return;
+    setDragId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', String(id)); } catch { /* 무시 */ }
+  }
+  function handleDragOver(e, id) {
+    if (!isAdmin || dragId == null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (id !== overId) setOverId(id);
+  }
+  function handleDragEnd() {
+    setDragId(null);
+    setOverId(null);
   }
 
   async function toggleVisibility(model) {
@@ -178,6 +209,7 @@ export default function Models() {
   // 리스트 뷰의 테이블 박스 하나를 렌더 (rows = 이 박스에 들어갈 모델들).
   // label 이 있으면 박스 위에 소제목(Fleet / 주문차)을 붙인다.
   function renderListTable(rows, label, keyBase) {
+    const groupIds = rows.map((r) => r.id);
     return (
       <div key={keyBase} className="mb-4 last:mb-0">
         {label && (
@@ -211,7 +243,7 @@ export default function Models() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {rows.map((model, idx) => {
+              {rows.map((model) => {
                 const isSelected = compareList.some((m) => m.id === model.id);
                 const notes = [...(notesByModel[model.id] ?? [])].sort(
                   (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
@@ -220,7 +252,14 @@ export default function Models() {
                   <tr
                     key={model.id}
                     onClick={() => navigate(`/models/${model.id}`)}
-                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${!model.is_visible ? 'opacity-50' : ''}`}
+                    draggable={isAdmin}
+                    onDragStart={(e) => handleDragStart(e, model.id)}
+                    onDragOver={(e) => handleDragOver(e, model.id)}
+                    onDrop={(e) => { e.preventDefault(); handleDrop(model.id, groupIds); }}
+                    onDragEnd={handleDragEnd}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${!model.is_visible ? 'opacity-50' : ''} ${
+                      dragId === model.id ? 'opacity-40' : ''
+                    } ${overId === model.id && dragId != null && dragId !== model.id ? 'border-t-2 border-mb-blue' : ''}`}
                   >
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       {model.name_ko ? (
@@ -307,24 +346,12 @@ export default function Models() {
                           </button>
                         </td>
                         <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-0.5">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); moveModel(model.id, rows[idx - 1].id); }}
-                              disabled={idx === 0 || reordering}
-                              title="위로 이동"
-                              className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); moveModel(model.id, rows[idx + 1].id); }}
-                              disabled={idx === rows.length - 1 || reordering}
-                              title="아래로 이동"
-                              className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                            >
-                              ↓
-                            </button>
-                          </div>
+                          <span
+                            title="드래그해서 순서 이동"
+                            className={`inline-block text-gray-400 select-none ${reordering ? 'opacity-40' : 'cursor-grab hover:text-gray-700'}`}
+                          >
+                            ⠿
+                          </span>
                         </td>
                       </>
                     )}
@@ -458,23 +485,20 @@ export default function Models() {
                       </div>
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                      {bodyModels.map((model, idx) => (
+                      {bodyModels.map((model) => (
                         <ModelCard
                           key={model.id}
                           model={model}
                           isSelected={compareList.some((m) => m.id === model.id)}
                           onCompareToggle={toggleCompare}
                           reordering={reordering}
-                          onMoveLeft={
-                            isAdmin && idx > 0
-                              ? () => moveModel(model.id, bodyModels[idx - 1].id)
-                              : null
-                          }
-                          onMoveRight={
-                            isAdmin && idx < bodyModels.length - 1
-                              ? () => moveModel(model.id, bodyModels[idx + 1].id)
-                              : null
-                          }
+                          draggable={isAdmin}
+                          isDragging={dragId === model.id}
+                          isDropTarget={overId === model.id && dragId != null && dragId !== model.id}
+                          onDragStart={(e) => handleDragStart(e, model.id)}
+                          onDragOver={(e) => handleDragOver(e, model.id)}
+                          onDrop={(e) => { e.preventDefault(); handleDrop(model.id, bodyModels.map((m) => m.id)); }}
+                          onDragEnd={handleDragEnd}
                         />
                       ))}
                     </div>
