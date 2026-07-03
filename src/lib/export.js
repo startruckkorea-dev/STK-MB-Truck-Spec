@@ -219,10 +219,14 @@ export async function exportDetailToExcel(model, specs, dict, notes = [], langua
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(title.slice(0, 31));
 
-  const colCount = canViewCodes ? 3 : 2;
-  ws.columns = canViewCodes
-    ? [{ width: 32 }, { width: 22 }, { width: 42 }]
-    : [{ width: 34 }, { width: 46 }];
+  const visibleSpecs = specs.filter(
+    (s) => !s.is_hidden && (canViewCodes || rowVisibleForSales(s, dict, language))
+  );
+  const groups = groupByCategory(visibleSpecs);
+
+  // 항목/값 2열 고정 (코드는 항목 칸에 함께 표기하므로 별도 코드 열 없음)
+  const colCount = 2;
+  ws.columns = [{ width: 40 }, { width: 46 }];
 
   // 기밀 표기 (상단 + 인쇄 머리글)
   applyConfidential(ws, colCount);
@@ -239,28 +243,20 @@ export async function exportDetailToExcel(model, specs, dict, notes = [], langua
   // 보충 설명
   if (notes.length > 0) {
     applyCategoryRow(ws, '보충 설명', colCount);
-    applyHeaderRow(ws, canViewCodes ? ['항목', '내용', ''] : ['항목', '내용']);
+    applyHeaderRow(ws, ['항목', '내용']);
     notes.forEach((note, i) => {
-      const vals = canViewCodes ? [note.label, note.content, ''] : [note.label, note.content];
-      applyDataRow(ws, vals, { even: i % 2 === 0 });
+      applyDataRow(ws, [note.label, note.content], { even: i % 2 === 0 });
     });
     ws.addRow([]);
   }
 
   // 사양 데이터 (영업직원은 영문 코드만 남는 행 제외)
-  applyHeaderRow(ws, canViewCodes ? ['항목', '코드', '값'] : ['항목', '값']);
-  const visibleSpecs = specs.filter(
-    (s) => !s.is_hidden && (canViewCodes || rowVisibleForSales(s, dict, language))
-  );
-  const groups = groupByCategory(visibleSpecs);
+  applyHeaderRow(ws, ['항목', '값']);
   groups.forEach(({ category, items }) => {
     applyCategoryRow(ws, category, colCount);
     items.forEach((spec, i) => {
       const translated = resolveValue(spec, dict, language, canViewCodes);
-      const label = resolveLabel(spec.label_ko, spec.spec_key, canViewCodes);
-      const code = codeCell(spec.spec_value, label, translated);
-      const vals = canViewCodes ? [label, code, translated] : [label, translated];
-      applyDataRow(ws, vals, { even: i % 2 === 0 });
+      applyDataRow(ws, [labelWithCode(spec, canViewCodes), translated], { even: i % 2 === 0 });
     });
   });
 
@@ -280,16 +276,6 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
   );
   const groups = groupByCategory(visibleSpecs);
 
-  // 가운데 "코드" 칸이 모든 행에서 비어 있으면(항목명이 이미 코드인 경우 등)
-  // 빈 열을 통째로 없앤다.
-  const showCodeCol = canViewCodes && groups.some(({ items }) =>
-    items.some((spec) => {
-      const label = resolveLabel(spec.label_ko, spec.spec_key, canViewCodes);
-      const translated = resolveValue(spec, dict, language, canViewCodes);
-      return codeCell(spec.spec_value, label, translated) !== '';
-    })
-  );
-
   let notesHtml = '';
   if (notes.length > 0) {
     notesHtml = `
@@ -303,22 +289,17 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
     `;
   }
 
-  const specColgroup = showCodeCol
-    ? '<col style="width:35%"><col style="width:20%"><col>'
-    : '<col style="width:35%"><col>';
+  // 항목/값 2열 고정 (코드는 항목 칸에 함께 표기하므로 별도 코드 열 없음)
   const specsHtml = groups.map(({ category, items }) => `
     <div class="category">${esc(category)}</div>
     <table>
-      <colgroup>${specColgroup}</colgroup>
+      <colgroup><col style="width:35%"><col></colgroup>
       <tbody>
         ${items.map((spec, i) => {
-          const label = resolveLabel(spec.label_ko, spec.spec_key, canViewCodes);
           const translated = resolveValue(spec, dict, language, canViewCodes);
-          const code = codeCell(spec.spec_value, label, translated);
           return `
           <tr class="${i % 2 === 0 ? 'even' : ''}">
-            <td>${esc(label)}</td>
-            ${showCodeCol ? `<td class="code">${esc(code)}</td>` : ''}
+            <td>${esc(labelWithCode(spec, canViewCodes))}</td>
             <td>${esc(translated)}</td>
           </tr>
         `;
@@ -708,12 +689,15 @@ function resolveLabel(labelKo, specKey, canViewCodes = true) {
   return labelKo || (canViewCodes ? specKey || '' : '');
 }
 
-// 가운데 "코드" 칸 값. 번역이 없어 값 칸이 코드로 폴백됐거나 항목명이 이미
-// 같은 코드일 때는 코드가 중복 표시되므로 가운데 칸을 비운다.
-function codeCell(specValue, label, translated) {
-  const code = specValue || '';
-  if (code && (code === translated || code === label)) return '';
-  return code;
+// 사양 상세 "항목" 칸 값 (별도 코드 열 없이 항목 칸에 코드까지 담는다).
+// - 국문 라벨이 없으면 라벨 = 코드(spec_key) 이므로 그대로 코드가 표시된다.
+// - 국문 라벨이 있고 코드 열람 권한이 있으면 "라벨 (코드)" 로 코드를 함께 표기.
+// - 코드 숨김(영업직원/코드숨김 출력)일 때는 코드를 덧붙이지 않는다.
+function labelWithCode(spec, canViewCodes = true) {
+  const label = resolveLabel(spec.label_ko, spec.spec_key, canViewCodes);
+  if (!canViewCodes || !spec.label_ko) return label;
+  const code = spec.spec_value || '';
+  return code && code !== label ? `${label} (${code})` : label;
 }
 
 // 영업직원에게 보여줄 내용이 있는 행인지 (라벨도 번역값도 없으면 영문 코드뿐 → 숨김)
