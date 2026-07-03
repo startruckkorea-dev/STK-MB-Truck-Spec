@@ -14,7 +14,7 @@ export default function Compare() {
   const idCount = idsKey ? idsKey.split(',').length : 0;
 
   const { models: allModels, specs: allSpecs, modelNotes, codeIndex, loading, error } = useData();
-  const { canViewCodes } = useAuth();
+  const { canViewCodes, canExportExcel, user } = useAuth();
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [lang] = useSpecLang();
   // 코드 열람 권한이 있어도 외부 배포용으로 코드를 숨겨 출력하는 옵션
@@ -100,18 +100,20 @@ export default function Compare() {
               코드숨김 출력
             </label>
           )}
+          {canExportExcel && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes)}
+              disabled={loading || models.length === 0}
+            >
+              Excel
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes)}
-            disabled={loading || models.length === 0}
-          >
-            Excel
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes)}
+            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes, user?.email)}
             disabled={loading || models.length === 0}
           >
             PDF

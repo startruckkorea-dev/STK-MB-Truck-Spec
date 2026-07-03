@@ -132,6 +132,8 @@ export function AuthProvider({ children }) {
   const canViewCodes = isAdmin || isStaffA || isStaffB;
   // 숨김(is_visible=false) 모델 열람: admin + 본사직원A
   const canViewHidden = isAdmin || isStaffA;
+  // Excel 내보내기: admin + 본사직원A 로 제한 (staff-B·sales 불가)
+  const canExportExcel = isAdmin || isStaffA;
   // 코드 사전 페이지 열람: admin + 본사직원A (A는 읽기 전용)
   const canViewDict = isAdmin || isStaffA;
   // 코드 사전 편집/삭제/엑셀열기/다시불러오기: admin 전용
@@ -156,6 +158,7 @@ export function AuthProvider({ children }) {
         isSales,
         canViewCodes,
         canViewHidden,
+        canExportExcel,
         canViewDict,
         canEditDict,
         canManageModels,

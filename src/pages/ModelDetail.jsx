@@ -35,7 +35,7 @@ function HomologButton({ url, label }) {
 
 export default function ModelDetail() {
   const { id } = useParams();
-  const { isAdmin, canViewCodes } = useAuth();
+  const { isAdmin, canViewCodes, canExportExcel, user } = useAuth();
   const { model, specs: initialSpecs, notes, loading, error } = useModelDetail(id);
   const { codeIndex: dict, setSpecHidden } = useData();
   const [specs, setSpecs] = useState([]);
@@ -148,17 +148,19 @@ export default function ModelDetail() {
             >
               📷 사진
             </Button>
+            {canExportExcel && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportDetailToExcel(model, specs, dict, notes, lang, exportCodes)}
+              >
+                Excel
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportDetailToExcel(model, specs, dict, notes, lang, exportCodes)}
-            >
-              Excel
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportDetailToPDF(model, specs, dict, notes, lang, exportCodes)}
+              onClick={() => exportDetailToPDF(model, specs, dict, notes, lang, exportCodes, user?.email)}
             >
               PDF
             </Button>

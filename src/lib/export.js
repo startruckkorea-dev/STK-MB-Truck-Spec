@@ -184,6 +184,23 @@ async function addExcelLogo(wb, ws) {
   ws.addRow([]); // 로고와 타이틀 사이 여백
 }
 
+// CONFIDENTIAL 표기 — 화면 상단에 붉은 텍스트 1행 + 인쇄 시 모든 페이지 우상단 머리글
+function applyConfidential(ws, colCount) {
+  // 인쇄용: 모든 페이지 우측 머리글에 붉은 굵은 글씨
+  ws.headerFooter.oddHeader = '&R&KD40000&"-,Bold"CONFIDENTIAL';
+  ws.headerFooter.evenHeader = '&R&KD40000&"-,Bold"CONFIDENTIAL';
+
+  // 화면 표시용: 상단 붉은 텍스트 1행 (우측 정렬)
+  const row = ws.addRow(['CONFIDENTIAL']);
+  row.height = 18;
+  ws.mergeCells(row.number, 1, row.number, colCount);
+  const cell = row.getCell(1);
+  cell.font = { name: FONT_BODY, size: 11, bold: true, color: { argb: 'FFD40000' } };
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: WHITE };
+  cell.alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+  cell.border = {}; // finalizeSheet 의 기본 테두리 적용 제외
+}
+
 async function saveWorkbook(wb, filename) {
   const buffer = await wb.xlsx.writeBuffer();
   saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
@@ -206,6 +223,9 @@ export async function exportDetailToExcel(model, specs, dict, notes = [], langua
   ws.columns = canViewCodes
     ? [{ width: 32 }, { width: 22 }, { width: 42 }]
     : [{ width: 34 }, { width: 46 }];
+
+  // 기밀 표기 (상단 + 인쇄 머리글)
+  applyConfidential(ws, colCount);
 
   // 로고 (상단 중앙)
   await addExcelLogo(wb, ws);
@@ -253,12 +273,22 @@ export async function exportDetailToExcel(model, specs, dict, notes = [], langua
 //  사양 상세 — PDF (브라우저 인쇄)
 // ═══════════════════════════════════════════════════════════════
 
-export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko', canViewCodes = true) {
+export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko', canViewCodes = true, userEmail = '') {
   const title = `${modelFullName(model)} (${model.model_year})`;
   const visibleSpecs = specs.filter(
     (s) => !s.is_hidden && (canViewCodes || rowVisibleForSales(s, dict, language))
   );
   const groups = groupByCategory(visibleSpecs);
+
+  // 가운데 "코드" 칸이 모든 행에서 비어 있으면(항목명이 이미 코드인 경우 등)
+  // 빈 열을 통째로 없앤다.
+  const showCodeCol = canViewCodes && groups.some(({ items }) =>
+    items.some((spec) => {
+      const label = resolveLabel(spec.label_ko, spec.spec_key, canViewCodes);
+      const translated = resolveValue(spec, dict, language, canViewCodes);
+      return codeCell(spec.spec_value, label, translated) !== '';
+    })
+  );
 
   let notesHtml = '';
   if (notes.length > 0) {
@@ -273,7 +303,7 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
     `;
   }
 
-  const specColgroup = canViewCodes
+  const specColgroup = showCodeCol
     ? '<col style="width:35%"><col style="width:20%"><col>'
     : '<col style="width:35%"><col>';
   const specsHtml = groups.map(({ category, items }) => `
@@ -288,7 +318,7 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
           return `
           <tr class="${i % 2 === 0 ? 'even' : ''}">
             <td>${esc(label)}</td>
-            ${canViewCodes ? `<td class="code">${esc(code)}</td>` : ''}
+            ${showCodeCol ? `<td class="code">${esc(code)}</td>` : ''}
             <td>${esc(translated)}</td>
           </tr>
         `;
@@ -297,7 +327,7 @@ export function exportDetailToPDF(model, specs, dict, notes = [], language = 'ko
     </table>
   `).join('');
 
-  openPrintWindow(title, notesHtml + specsHtml);
+  openPrintWindow(title, notesHtml + specsHtml, { userEmail });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -317,6 +347,9 @@ export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}
     { width: 32 },
     ...models.map(() => ({ width: 30 })),
   ];
+
+  // 기밀 표기 (상단 + 인쇄 머리글)
+  applyConfidential(ws, colCount);
 
   // 로고 (상단 중앙)
   await addExcelLogo(wb, ws);
@@ -386,7 +419,7 @@ export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}
 //  비교 — PDF (브라우저 인쇄)
 // ═══════════════════════════════════════════════════════════════
 
-export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDiffOnly = false, language = 'ko', canViewCodes = true) {
+export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDiffOnly = false, language = 'ko', canViewCodes = true, userEmail = '') {
   const allKeys = buildAllKeys(models, specsMap, dict);
   const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, language, canViewCodes) : null;
 
@@ -484,14 +517,14 @@ export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDi
     flushTable();
   }
 
-  openPrintWindow(title, notesHtml + specsHtml, models.length > 2);
+  openPrintWindow(title, notesHtml + specsHtml, { landscape: models.length > 2, userEmail });
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  PDF 인쇄 윈도우
 // ═══════════════════════════════════════════════════════════════
 
-function openPrintWindow(title, bodyHtml, landscape = false) {
+function openPrintWindow(title, bodyHtml, { landscape = false, userEmail = '' } = {}) {
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) {
     alert('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.');
@@ -598,12 +631,30 @@ function openPrintWindow(title, bodyHtml, landscape = false) {
     border-top: 1px solid #e5e7eb;
   }
 
+  /* 기밀 표기 — position:fixed 는 인쇄 시 페이지마다 반복된다 */
+  .confidential {
+    position: fixed;
+    top: 6mm;
+    right: 6mm;
+    color: #d40000;
+    border: 2px solid #d40000;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    border-radius: 4px;
+    z-index: 1000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   @media print {
     body { padding: 0; }
     .no-print { display: none !important; }
     .header { break-after: avoid; }
     table { break-inside: auto; }
     tr { break-inside: avoid; }
+    .confidential { position: fixed; }
   }
 </style>
 </head>
@@ -618,12 +669,13 @@ function openPrintWindow(title, bodyHtml, landscape = false) {
       인쇄 대화상자에서 "PDF로 저장"을 선택하세요
     </span>
   </div>
+  <div class="confidential">CONFIDENTIAL</div>
   <div class="logo">
     <img src="${window.location.origin}${LOGO_URL}" alt="logo" />
   </div>
   <div class="header">
     <h1>${esc(title)}</h1>
-    <div class="date">생성일: ${new Date().toLocaleDateString('ko-KR')}</div>
+    <div class="date">생성일: ${new Date().toLocaleDateString('ko-KR')}${userEmail ? ` &nbsp;·&nbsp; 출력자: ${esc(userEmail)}` : ''}</div>
   </div>
   ${bodyHtml}
   <div class="footer">Star Truck Korea</div>
