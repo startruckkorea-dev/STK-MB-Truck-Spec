@@ -40,13 +40,8 @@ function resolveSiteId() {
   return _sitePromise;
 }
 
-/**
- * 모델 정보로부터 사진 폴더 상대경로를 자동 생성한다.
- *   예: { series:'Actros', code:'2863LS', axle:'6x2', cabin:'G5F', model_year:'MY26' }
- *       → 'MY26/Actros 2863LS 6x2 G5F'
- * 폴더명은 상세 헤더에 표시되는 모델명과 동일한 규칙으로 조립한다.
- */
-export function modelPictureFolder(model) {
+// 'MY26/Actros 2863LS 6x2 G5F' 형태의 기본 폴더 경로 (부가설명 제외)
+function baseFolder(model) {
   if (!model) return null;
   const my = String(model.model_year || '').trim();
   if (!my) return null;
@@ -61,16 +56,31 @@ export function modelPictureFolder(model) {
 }
 
 /**
- * 모델의 사진 목록을 조회한다.
- * @returns {{ name, id, thumbUrl, fullUrl }[]}  폴더 없음(404)이면 빈 배열
+ * 모델의 사진 폴더 후보 경로들을 우선순위 순으로 반환한다.
+ *
+ * 이름(시리즈·코드·축·캐빈)이 같아도 부가설명(code_desc)이 다른 변형 모델이
+ * 서로 다른 사진을 보도록, 부가설명을 폴더명 뒤에 붙인 경로를 먼저 시도한다.
+ *   예: 부가설명 '챔피언 에디션' → 'MY26/Actros 2863LS 6x2 G5F 챔피언 에디션'
+ *       그 폴더가 없으면 → 'MY26/Actros 2863LS 6x2 G5F' (기본) 로 폴백
  */
-export async function listModelPictures(model) {
-  const rel = modelPictureFolder(model);
-  if (!rel) return [];
+export function modelPictureFolderCandidates(model) {
+  const base = baseFolder(model);
+  if (!base) return [];
+  const desc = String(model?.code_desc || '').trim();
+  const paths = [];
+  if (desc) paths.push(`${base} ${desc}`);
+  paths.push(base);
+  return paths;
+}
 
-  const siteId = await resolveSiteId();
+/** 관리자 안내용 — 이 모델에 권장되는 사진 폴더명(가장 우선순위 높은 후보) */
+export function modelPictureFolder(model) {
+  return modelPictureFolderCandidates(model)[0] || null;
+}
+
+// 단일 폴더의 이미지 목록을 조회한다. 폴더 없음(404)이면 null(→ 다음 후보 시도).
+async function listFolderImages(siteId, rel) {
   const fullPath = `${PICTURES_PATH}/${rel}`;
-
   let r;
   try {
     r = await graphGet(
@@ -78,8 +88,7 @@ export async function listModelPictures(model) {
         `?$top=200&$expand=thumbnails&$select=name,id,file,thumbnails,@microsoft.graph.downloadUrl`
     );
   } catch (err) {
-    // 폴더가 아직 없는 모델은 사진 없음으로 취급
-    if (/\b404\b/.test(err.message)) return [];
+    if (/\b404\b/.test(err.message)) return null; // 폴더 없음 → 폴백
     throw err;
   }
 
@@ -99,4 +108,21 @@ export async function listModelPictures(model) {
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+}
+
+/**
+ * 모델의 사진 목록을 조회한다.
+ * 후보 폴더를 우선순위 순으로 시도해, 실제로 존재하는 첫 폴더의 이미지를 반환한다.
+ * @returns {{ name, id, thumbUrl, fullUrl }[]}  모든 후보 폴더가 없으면 빈 배열
+ */
+export async function listModelPictures(model) {
+  const candidates = modelPictureFolderCandidates(model);
+  if (!candidates.length) return [];
+
+  const siteId = await resolveSiteId();
+  for (const rel of candidates) {
+    const imgs = await listFolderImages(siteId, rel);
+    if (imgs !== null) return imgs; // 폴더가 존재하면(비어 있어도) 그 결과 사용
+  }
+  return [];
 }

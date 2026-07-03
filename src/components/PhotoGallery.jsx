@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { listModelPictures } from '../lib/pictures';
+import { listModelPictures, modelPictureFolder } from '../lib/pictures';
 
 export default function PhotoGallery({ model, onClose }) {
   const [photos, setPhotos] = useState(null); // null=로딩중
@@ -99,7 +99,10 @@ export default function PhotoGallery({ model, onClose }) {
             <div className="text-center py-16 text-sm text-gray-400">
               등록된 사진이 없습니다.
               <p className="text-xs text-gray-300 mt-1">
-                SharePoint 사진 폴더에 이미지를 추가하면 여기에 표시됩니다.
+                아래 SharePoint 폴더에 이미지를 추가하면 여기에 표시됩니다.
+              </p>
+              <p className="text-xs text-gray-500 mt-2 font-mono break-all">
+                Pictures/{modelPictureFolder(model)}
               </p>
             </div>
           )}
