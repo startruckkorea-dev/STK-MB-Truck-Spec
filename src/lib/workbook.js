@@ -25,7 +25,9 @@ export const SHEETS = {
     types: { id: 'num', is_hidden: 'bool' },
   },
   models: {
-    columns: ['id', 'series', 'code', 'axle', 'cabin', 'code_desc', 'name_ko', 'model_year', 'production_month', 'badge', 'is_visible', 'sort_order'],
+    // 인증 자료 링크(homolog_spec_url=제원표, homolog_view_url=외관사면도)는 sort_order 뒤에 추가.
+    // 앱은 컬럼을 위치 기준으로 읽으므로 반드시 맨 뒤에 둔다(기존 컬럼 순서 유지).
+    columns: ['id', 'series', 'code', 'axle', 'cabin', 'code_desc', 'name_ko', 'model_year', 'production_month', 'badge', 'is_visible', 'sort_order', 'homolog_spec_url', 'homolog_view_url'],
     types: { id: 'num', is_visible: 'bool', sort_order: 'num' },
   },
   specs: {

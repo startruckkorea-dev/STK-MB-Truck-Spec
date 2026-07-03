@@ -29,6 +29,9 @@ export default function AdminModelEdit() {
   const [productionMonth, setProductionMonth] = useState('');
   const [badge, setBadge] = useState('');
   const [isVisible, setIsVisible] = useState(true);
+  // 인증 자료 SharePoint 공유 링크
+  const [homologSpecUrl, setHomologSpecUrl] = useState('');   // 제원표
+  const [homologViewUrl, setHomologViewUrl] = useState('');   // 외관사면도
 
   // ── 파싱 상태 ──
   const [parsedSpecs, setParsedSpecs] = useState(null); // null | Spec[]
@@ -62,6 +65,8 @@ export default function AdminModelEdit() {
     setProductionMonth(m.production_month ?? '');
     setBadge(m.badge ?? '');
     setIsVisible(m.is_visible !== false);
+    setHomologSpecUrl(m.homolog_spec_url ?? '');
+    setHomologViewUrl(m.homolog_view_url ?? '');
     setParsedSpecs(
       cachedSpecs
         .filter((s) => Number(s.model_id) === Number(id))
@@ -243,6 +248,8 @@ export default function AdminModelEdit() {
         production_month: productionMonth?.trim() || null,
         badge: badge || null,
         is_visible: isVisible,
+        homolog_spec_url: homologSpecUrl?.trim() || null,
+        homolog_view_url: homologViewUrl?.trim() || null,
       };
       if (isEdit) modelObj.id = Number(id);
 
@@ -425,6 +432,37 @@ export default function AdminModelEdit() {
               onChange={setIsVisible}
               label={isVisible ? '공개 (영업직원에게 표시)' : '숨김 (admin만 확인)'}
             />
+          </div>
+
+          {/* 인증(homologation) 자료 링크 카드 */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 space-y-3 sm:space-y-4">
+            <h2 className="font-barlow font-semibold text-gray-800 tracking-wide uppercase text-sm">
+              인증 자료 링크
+            </h2>
+            <p className="text-xs text-gray-400 -mt-1">
+              SharePoint 파일의 공유 링크를 붙여넣으면 상세 화면에 [제원표]·[외관사면도] 버튼이 활성화됩니다.
+              빈 칸이면 해당 버튼은 비활성화됩니다.
+            </p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">제원표 링크</label>
+              <input
+                value={homologSpecUrl}
+                onChange={(e) => setHomologSpecUrl(e.target.value)}
+                placeholder="https://startruckkorea.sharepoint.com/..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">외관사면도 링크</label>
+              <input
+                value={homologViewUrl}
+                onChange={(e) => setHomologViewUrl(e.target.value)}
+                placeholder="https://startruckkorea.sharepoint.com/..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
+              />
+            </div>
           </div>
 
           {/* .docx 업로드 카드 */}

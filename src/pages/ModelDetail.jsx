@@ -12,6 +12,27 @@ import { useData } from '../contexts/DataContext';
 import { exportDetailToExcel, exportDetailToPDF } from '../lib/export';
 
 
+// 인증 자료 링크 버튼 — 링크가 있으면 새 탭으로 SharePoint 열기, 없으면 비활성.
+function HomologButton({ url, label }) {
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center justify-center gap-1.5 font-medium rounded transition-colors focus:outline-none focus:ring-2 focus:ring-mb-blue focus:ring-offset-1 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 px-2.5 py-1.5 text-xs"
+      >
+        📄 {label}
+      </a>
+    );
+  }
+  return (
+    <Button variant="outline" size="sm" disabled title="등록된 링크가 없습니다">
+      📄 {label}
+    </Button>
+  );
+}
+
 export default function ModelDetail() {
   const { id } = useParams();
   const { isAdmin, canViewCodes } = useAuth();
@@ -118,6 +139,8 @@ export default function ModelDetail() {
                 코드숨김 출력
               </label>
             )}
+            <HomologButton url={model.homolog_spec_url} label="제원표" />
+            <HomologButton url={model.homolog_view_url} label="외관사면도" />
             <Button
               variant="primary"
               size="sm"
