@@ -4,10 +4,13 @@
  * 모델 등록 화면에서 로컬 PC 업로드 대신 공유폴더의 .docx 를 직접 고른다.
  * MY 연도 → 생산월 → 파일 순으로 폴더를 내려가며 탐색한다.
  *
+ * 기본값은 견적서(.docx) 폴더를 탐색하지만, listFolder/rootLabel/title/hint 를
+ * 넘겨 다른 SharePoint 폴더(예: 인증 자료)에도 재사용할 수 있다.
+ *
  * 사용법:
  *   {open && (
  *     <SharePointPicker
- *       onPick={(file, folderPath) => { ... }}   // file: {name,downloadUrl,size}
+ *       onPick={(file, folderPath) => { ... }}   // file: {name,downloadUrl|webUrl,size}
  *       onClose={() => setOpen(false)}
  *     />
  *   )}
@@ -23,8 +26,15 @@ function formatSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export default function SharePointPicker({ onPick, onClose }) {
-  const [path, setPath] = useState(''); // 견적서 루트 기준 상대경로
+export default function SharePointPicker({
+  onPick,
+  onClose,
+  listFolder = listSourceFolder,
+  rootLabel = QUOTATION_ROOT_LABEL,
+  title = 'SharePoint 견적서 선택',
+  hint = '폴더를 눌러 이동하고, .docx 파일을 누르면 등록 화면으로 불러옵니다.',
+}) {
+  const [path, setPath] = useState(''); // 루트 기준 상대경로
   const [data, setData] = useState(null); // { folders, files }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,7 +43,7 @@ export default function SharePointPicker({ onPick, onClose }) {
     let alive = true;
     setLoading(true);
     setError('');
-    listSourceFolder(path)
+    listFolder(path)
       .then((d) => alive && setData(d))
       .catch((e) => alive && setError(e.message))
       .finally(() => alive && setLoading(false));
@@ -56,7 +66,7 @@ export default function SharePointPicker({ onPick, onClose }) {
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <h3 className="font-barlow font-semibold text-gray-800 tracking-wide uppercase text-sm">
-            SharePoint 견적서 선택
+            {title}
           </h3>
           <button
             onClick={onClose}
@@ -73,7 +83,7 @@ export default function SharePointPicker({ onPick, onClose }) {
             onClick={() => setPath('')}
             className="text-mb-blue hover:underline font-medium"
           >
-            {QUOTATION_ROOT_LABEL}
+            {rootLabel}
           </button>
           {crumbs.map((c, i) => (
             <span key={i} className="flex items-center gap-1">
@@ -149,7 +159,7 @@ export default function SharePointPicker({ onPick, onClose }) {
         {/* 안내 */}
         <div className="px-5 py-2.5 border-t border-gray-100">
           <p className="text-xs text-gray-400">
-            폴더를 눌러 이동하고, .docx 파일을 누르면 등록 화면으로 불러옵니다.
+            {hint}
           </p>
         </div>
       </div>

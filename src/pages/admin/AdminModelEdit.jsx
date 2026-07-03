@@ -6,7 +6,19 @@ import Toggle from '../../components/ui/Toggle';
 import SharePointPicker from '../../components/admin/SharePointPicker';
 import { parseDocx, parseQuotationFilename } from '../../lib/parser';
 import { downloadSourceFile } from '../../lib/sourceFiles';
+import { listHomologationFolder, HOMOLOGATION_ROOT_LABEL } from '../../lib/homologation';
 import { useData } from '../../contexts/DataContext';
+
+// SharePoint webUrl 에서 표시용 파일명 추출 (마지막 경로 세그먼트, 쿼리 제거)
+function fileNameFromUrl(url) {
+  if (!url) return '';
+  try {
+    const path = decodeURIComponent(String(url).split('?')[0]);
+    return path.split('/').pop() || url;
+  } catch {
+    return url;
+  }
+}
 
 const SERIES_OPTIONS = ['Actros', 'Arocs', 'Atego'];
 
@@ -41,7 +53,8 @@ export default function AdminModelEdit() {
   // idle | parsing | preview | saving | done | error
 
   const [isDragOver, setIsDragOver] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false); // SharePoint 선택 모달
+  const [pickerOpen, setPickerOpen] = useState(false); // SharePoint 견적서 선택 모달
+  const [homologPicker, setHomologPicker] = useState(null); // null | 'spec' | 'view'
   const [errorMsg, setErrorMsg] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -440,29 +453,22 @@ export default function AdminModelEdit() {
               인증 자료 링크
             </h2>
             <p className="text-xs text-gray-400 -mt-1">
-              SharePoint 파일의 공유 링크를 붙여넣으면 상세 화면에 [제원표]·[외관사면도] 버튼이 활성화됩니다.
-              빈 칸이면 해당 버튼은 비활성화됩니다.
+              SharePoint 인증 자료 폴더에서 파일을 선택하면 상세 화면에 [제원표]·[외관사면도] 버튼이 활성화됩니다.
+              선택하지 않으면 해당 버튼은 비활성화됩니다.
             </p>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">제원표 링크</label>
-              <input
-                value={homologSpecUrl}
-                onChange={(e) => setHomologSpecUrl(e.target.value)}
-                placeholder="https://startruckkorea.sharepoint.com/..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">외관사면도 링크</label>
-              <input
-                value={homologViewUrl}
-                onChange={(e) => setHomologViewUrl(e.target.value)}
-                placeholder="https://startruckkorea.sharepoint.com/..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
-              />
-            </div>
+            <HomologLinkRow
+              label="제원표"
+              url={homologSpecUrl}
+              onSelect={() => setHomologPicker('spec')}
+              onClear={() => setHomologSpecUrl('')}
+            />
+            <HomologLinkRow
+              label="외관사면도"
+              url={homologViewUrl}
+              onSelect={() => setHomologPicker('view')}
+              onClear={() => setHomologViewUrl('')}
+            />
           </div>
 
           {/* .docx 업로드 카드 */}
@@ -684,6 +690,67 @@ export default function AdminModelEdit() {
           onClose={() => setPickerOpen(false)}
         />
       )}
+
+      {/* SharePoint 인증 자료 선택 모달 */}
+      {homologPicker && (
+        <SharePointPicker
+          listFolder={listHomologationFolder}
+          rootLabel={HOMOLOGATION_ROOT_LABEL}
+          title={`SharePoint 인증 자료 선택 — ${homologPicker === 'spec' ? '제원표' : '외관사면도'}`}
+          hint="폴더를 눌러 이동하고, 파일을 누르면 해당 항목에 연동됩니다."
+          onPick={(file) => {
+            const url = file.webUrl || '';
+            if (homologPicker === 'spec') setHomologSpecUrl(url);
+            else setHomologViewUrl(url);
+            setHomologPicker(null);
+          }}
+          onClose={() => setHomologPicker(null)}
+        />
+      )}
     </Layout>
+  );
+}
+
+// 인증 자료 링크 1행 — 현재 선택된 파일명 표시 + 선택/변경/해제
+function HomologLinkRow({ label, url, onSelect, onClear }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      {url ? (
+        <div className="flex items-center gap-2">
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 min-w-0 truncate text-sm text-mb-blue hover:underline"
+            title={fileNameFromUrl(url)}
+          >
+            📄 {fileNameFromUrl(url)}
+          </a>
+          <button
+            type="button"
+            onClick={onSelect}
+            className="shrink-0 px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 text-xs font-medium hover:bg-gray-50"
+          >
+            변경
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            className="shrink-0 px-2.5 py-1.5 rounded-lg border border-red-200 text-red-500 text-xs font-medium hover:bg-red-50"
+          >
+            해제
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onSelect}
+          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors"
+        >
+          📁 SharePoint 에서 선택
+        </button>
+      )}
+    </div>
   );
 }
