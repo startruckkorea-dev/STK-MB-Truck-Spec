@@ -347,15 +347,14 @@ export async function exportCompareToExcel(models, specsMap, dict, notesMap = {}
   // 헤더
   applyHeaderRow(ws, ['항목', ...models.map((m) => `${modelFullName(m)}\n(${m.model_year})`)]);
 
+  const renderRows = buildRenderRows(allKeys, diffSet);
   let rowIndex = 0;
-  allKeys.forEach((row) => {
+  renderRows.forEach((row) => {
     if (row.type === 'category') {
-      if (diffSet && !diffSet.categories.has(row.category)) return;
       applyCategoryRow(ws, row.category, colCount);
       rowIndex = 0;
       return;
     }
-    if (diffSet && !diffSet.specKeys.has(row.spec_key)) return;
 
     const values = models.map((m) => {
       const specs = specsMap[m.id] ?? [];
@@ -394,6 +393,30 @@ export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDi
   const title = `모델 비교: ${models.map((m) => modelFullName(m)).join(' vs ')}`;
   const modelHeaders = models.map((m) => `<th>${esc(modelFullName(m))}<br><small>${m.model_year}</small></th>`).join('');
 
+  // 모든 비교 테이블이 동일한 열 너비를 갖도록 고정 colgroup (항목 25% + 모델 균등)
+  const modelColW = (75 / models.length).toFixed(3);
+  const colgroupHtml = `<colgroup><col style="width:25%">${models.map(() => `<col style="width:${modelColW}%">`).join('')}</colgroup>`;
+
+  // 사양 행 하나를 <tr> 문자열로 렌더 (없으면 '')
+  const renderSpecRow = (row, rowIdx) => {
+    const values = models.map((m) => {
+      const specs = specsMap[m.id] ?? [];
+      const spec = specs.find((s) => s.spec_key === row.spec_key);
+      if (!spec) return '—';
+      return resolveValue(spec, dict, language, canViewCodes);
+    });
+
+    // 영업직원: 라벨도 없고 값도 전부 비면 영문 코드뿐이던 행 → 건너뜀
+    if (!canViewCodes && !row.labelKo && values.every((v) => !v || v === '—')) return '';
+
+    const uniqueVals = new Set(values.filter((v) => v !== '—'));
+    const hasAbsent = values.some((v) => v === '—');
+    const isDiff = uniqueVals.size > 1 || (hasAbsent && uniqueVals.size > 0);
+
+    const cells = values.map((v) => `<td>${esc(v)}</td>`).join('');
+    return `<tr class="${isDiff ? 'diff' : ''} ${rowIdx % 2 === 0 ? 'even' : ''}"><td>${esc(resolveLabel(row.labelKo, row.spec_key, canViewCodes))}</td>${cells}</tr>`;
+  };
+
   // 보충 설명
   let notesHtml = '';
   const hasNotes = models.some((m) => (notesMap[m.id] ?? []).length > 0);
@@ -410,56 +433,56 @@ export function exportCompareToPDF(models, specsMap, dict, notesMap = {}, showDi
     }
     notesHtml = `
       <div class="category">보충 설명</div>
-      <table><thead><tr><th style="width:25%">항목</th>${modelHeaders}</tr></thead>
+      <table>${colgroupHtml}<thead><tr><th>항목</th>${modelHeaders}</tr></thead>
       <tbody>${noteRows}</tbody></table>
     `;
   }
 
   // 사양 테이블
   let specsHtml = '';
-  let currentCategory = '';
-  let tableRows = '';
-  let rowIdx = 0;
-
-  const flushTable = () => {
-    if (!tableRows) return;
-    specsHtml += `
-      <div class="category">${esc(currentCategory)}</div>
-      <table><thead><tr><th style="width:25%">항목</th>${modelHeaders}</tr></thead>
-      <tbody>${tableRows}</tbody></table>
-    `;
-    tableRows = '';
-  };
-
-  allKeys.forEach((row) => {
-    if (row.type === 'category') {
-      if (diffSet && !diffSet.categories.has(row.category)) return;
-      flushTable();
-      currentCategory = row.category;
-      rowIdx = 0;
-      return;
-    }
-    if (diffSet && !diffSet.specKeys.has(row.spec_key)) return;
-
-    const values = models.map((m) => {
-      const specs = specsMap[m.id] ?? [];
-      const spec = specs.find((s) => s.spec_key === row.spec_key);
-      if (!spec) return '—';
-      return resolveValue(spec, dict, language, canViewCodes);
+  if (showDiffOnly) {
+    // 차이점만 보기: 카테고리 그룹 없이 코드(spec_key) A→Z 로 평면 정렬한 단일 표
+    const diffRows = buildRenderRows(allKeys, diffSet);
+    let tableRows = '';
+    let rowIdx = 0;
+    diffRows.forEach((row) => {
+      const tr = renderSpecRow(row, rowIdx);
+      if (tr) { tableRows += tr; rowIdx++; }
     });
+    if (tableRows) {
+      specsHtml = `
+        <table>${colgroupHtml}<thead><tr><th>항목</th>${modelHeaders}</tr></thead>
+        <tbody>${tableRows}</tbody></table>
+      `;
+    }
+  } else {
+    // 전체 보기: 카테고리별 표
+    let currentCategory = '';
+    let tableRows = '';
+    let rowIdx = 0;
 
-    // 영업직원: 라벨도 없고 값도 전부 비면 영문 코드뿐이던 행 → 건너뜀
-    if (!canViewCodes && !row.labelKo && values.every((v) => !v || v === '—')) return;
+    const flushTable = () => {
+      if (!tableRows) return;
+      specsHtml += `
+        <div class="category">${esc(currentCategory)}</div>
+        <table>${colgroupHtml}<thead><tr><th>항목</th>${modelHeaders}</tr></thead>
+        <tbody>${tableRows}</tbody></table>
+      `;
+      tableRows = '';
+    };
 
-    const uniqueVals = new Set(values.filter((v) => v !== '—'));
-    const hasAbsent = values.some((v) => v === '—');
-    const isDiff = uniqueVals.size > 1 || (hasAbsent && uniqueVals.size > 0);
-
-    const cells = values.map((v) => `<td>${esc(v)}</td>`).join('');
-    tableRows += `<tr class="${isDiff ? 'diff' : ''} ${rowIdx % 2 === 0 ? 'even' : ''}"><td>${esc(resolveLabel(row.labelKo, row.spec_key, canViewCodes))}</td>${cells}</tr>`;
-    rowIdx++;
-  });
-  flushTable();
+    allKeys.forEach((row) => {
+      if (row.type === 'category') {
+        flushTable();
+        currentCategory = row.category;
+        rowIdx = 0;
+        return;
+      }
+      const tr = renderSpecRow(row, rowIdx);
+      if (tr) { tableRows += tr; rowIdx++; }
+    });
+    flushTable();
+  }
 
   openPrintWindow(title, notesHtml + specsHtml, models.length > 2);
 }
@@ -537,6 +560,7 @@ function openPrintWindow(title, bodyHtml, landscape = false) {
   table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
     margin-bottom: 12px;
     font-size: 11px;
   }
@@ -556,6 +580,8 @@ function openPrintWindow(title, bodyHtml, landscape = false) {
     color: #1a1a1a;
     vertical-align: top;
     line-height: 1.5;
+    word-break: break-word;
+    overflow-wrap: anywhere;
   }
   tbody tr { background: #fff; }
   tbody tr.even { background: #f9fafb; }
@@ -684,6 +710,17 @@ function buildAllKeys(models, specsMap, dict) {
     keys.forEach((k) => result.push({ type: 'spec', category: cat, ...k }));
   });
   return result;
+}
+
+// 렌더링할 행 목록.
+// - 전체 보기(diffSet 없음): 카테고리 헤더 + 사양행을 원래 순서대로.
+// - 차이점만 보기(diffSet 있음): 카테고리 그룹 없이, 차이 나는 사양행만
+//   코드(spec_key) A→Z 오름차순 평면 정렬.
+function buildRenderRows(allKeys, diffSet) {
+  if (!diffSet) return allKeys;
+  return allKeys
+    .filter((r) => r.type === 'spec' && diffSet.specKeys.has(r.spec_key))
+    .sort((a, b) => String(a.spec_key || '').localeCompare(String(b.spec_key || '')));
 }
 
 function buildDiffSet(allKeys, models, specsMap, dict, language = 'ko', canViewCodes = true) {

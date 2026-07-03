@@ -27,6 +27,14 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
   // showDiffOnly 시 diff 여부를 미리 계산
   const diffSet = showDiffOnly ? buildDiffSet(allKeys, models, specsMap, dict, isAdmin, language) : null;
 
+  // 렌더 행: 전체 보기는 카테고리 헤더 포함 원래 순서,
+  // 차이점만 보기는 카테고리 그룹 없이 코드(spec_key) A→Z 오름차순 평면 정렬.
+  const renderRows = diffSet
+    ? allKeys
+        .filter((r) => r.type === 'spec' && diffSet.specKeys.has(r.spec_key))
+        .sort((a, b) => String(a.spec_key || '').localeCompare(String(b.spec_key || '')))
+    : allKeys;
+
   const hasAnyNotes = models.some((m) => (notesMap[m.id] ?? []).length > 0);
 
   return (
@@ -100,10 +108,8 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
             </>
           )}
 
-          {allKeys.map((row) => {
+          {renderRows.map((row) => {
             if (row.type === 'category') {
-              // showDiffOnly 시 이 카테고리에 diff 항목이 없으면 skip
-              if (diffSet && !diffSet.categories.has(row.category)) return null;
               return (
                 <tr key={`cat-${row.category}`} className="bg-gray-50">
                   <td

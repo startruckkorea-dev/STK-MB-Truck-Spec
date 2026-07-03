@@ -21,6 +21,9 @@ const BADGE_LABELS = {
   'branch-order': 'Branch주문차',
 };
 
+// Fleet / 주문차 배지 — 같은 MY 안에서 별도 리스트 박스로 분리한다
+const FLEET_BADGES = new Set(['fleet-domestic', 'fleet-export', 'branch-order']);
+
 const VIEW_KEY = 'models-view-mode';
 
 // 차종 정렬 우선순위
@@ -172,6 +175,169 @@ export default function Models() {
     }
   }
 
+  // 리스트 뷰의 테이블 박스 하나를 렌더 (rows = 이 박스에 들어갈 모델들).
+  // label 이 있으면 박스 위에 소제목(Fleet / 주문차)을 붙인다.
+  function renderListTable(rows, label, keyBase) {
+    return (
+      <div key={keyBase} className="mb-4 last:mb-0">
+        {label && (
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-semibold text-emerald-600 uppercase tracking-widest pl-1">
+              {label}
+            </span>
+            <div className="flex-1 h-px bg-emerald-100" />
+          </div>
+        )}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50 text-left text-gray-500">
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">차종분류</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">시리즈</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">모델코드</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">축</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">캐빈</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">배지</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">생산월</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">비교</th>
+                {isAdmin && (
+                  <>
+                    <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">상태</th>
+                    <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">공개</th>
+                    <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">순서</th>
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((model, idx) => {
+                const isSelected = compareList.some((m) => m.id === model.id);
+                const notes = [...(notesByModel[model.id] ?? [])].sort(
+                  (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+                );
+                return (
+                  <tr
+                    key={model.id}
+                    onClick={() => navigate(`/models/${model.id}`)}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${!model.is_visible ? 'opacity-50' : ''}`}
+                  >
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {model.name_ko ? (
+                        <Badge variant="default">{model.name_ko}</Badge>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>
+                        {model.series}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-sm text-gray-800 whitespace-nowrap">
+                      {model.code}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
+                      {model.axle || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
+                      {model.cabin || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {model.badge ? (
+                        <Badge variant={model.badge}>
+                          {BADGE_LABELS[model.badge] ?? model.badge}
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {notes.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {notes.map((n) => (
+                            <span
+                              key={n.id}
+                              className="inline-block text-xs bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded"
+                            >
+                              {n.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : model.code_desc ? (
+                        <span className="text-xs text-gray-400">{model.code_desc}</span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-mb-blue font-semibold whitespace-nowrap">
+                      {model.production_month || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleCompare(model); }}
+                        className={`px-2.5 py-1 text-xs rounded border transition-colors ${
+                          isSelected
+                            ? 'bg-mb-blue text-white border-mb-blue'
+                            : 'text-gray-600 border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {isSelected ? '해제' : '비교'}
+                      </button>
+                    </td>
+                    {isAdmin && (
+                      <>
+                        <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${
+                              model.is_visible
+                                ? 'bg-green-50 text-green-700'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}
+                          >
+                            {model.is_visible ? '공개' : '숨김'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleVisibility(model); }}
+                            className="px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                          >
+                            {model.is_visible ? '숨기기' : '공개하기'}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-0.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); moveModel(model.id, rows[idx - 1].id); }}
+                              disabled={idx === 0 || reordering}
+                              title="위로 이동"
+                              className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); moveModel(model.id, rows[idx + 1].id); }}
+                              disabled={idx === rows.length - 1 || reordering}
+                              title="아래로 이동"
+                              className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Layout>
       {/* 헤더 */}
@@ -317,165 +483,27 @@ export default function Models() {
               </div>
             ))
           ) : (
-            /* 리스트 뷰 — MY별 그룹 + 테이블 */
-            groupedList.map(({ year, models: yearModels }) => (
-              <div key={year} className="mb-8 sm:mb-10">
-                {/* MY 섹션 헤더 */}
-                <div className="flex items-center gap-3 mb-3">
-                  <span className={`font-barlow font-bold text-base tracking-widest px-3 py-1 rounded ${getYearHeaderStyle(year)}`}>
-                    {year}
-                  </span>
-                  <div className="flex-1 h-px bg-gray-200" />
-                </div>
+            /* 리스트 뷰 — MY별 그룹, Fleet/주문차는 별도 박스로 분리 */
+            groupedList.map(({ year, models: yearModels }) => {
+              const normalModels = yearModels.filter((m) => !FLEET_BADGES.has(m.badge));
+              const fleetModels = yearModels.filter((m) => FLEET_BADGES.has(m.badge));
+              return (
+                <div key={year} className="mb-8 sm:mb-10">
+                  {/* MY 섹션 헤더 */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className={`font-barlow font-bold text-base tracking-widest px-3 py-1 rounded ${getYearHeaderStyle(year)}`}>
+                      {year}
+                    </span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
 
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50 text-left text-gray-500">
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">차종분류</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">시리즈</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">모델코드</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">축</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">캐빈</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">배지</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">생산월</th>
-                        <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">비교</th>
-                        {isAdmin && (
-                          <>
-                            <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">상태</th>
-                            <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">공개</th>
-                            <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">순서</th>
-                          </>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {yearModels.map((model, idx) => {
-                        const isSelected = compareList.some((m) => m.id === model.id);
-                        const notes = [...(notesByModel[model.id] ?? [])].sort(
-                          (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
-                        );
-                        return (
-                          <tr
-                            key={model.id}
-                            onClick={() => navigate(`/models/${model.id}`)}
-                            className={`hover:bg-gray-50 transition-colors cursor-pointer ${!model.is_visible ? 'opacity-50' : ''}`}
-                          >
-                            <td className="px-3 py-2.5 whitespace-nowrap">
-                              {model.name_ko ? (
-                                <Badge variant="default">{model.name_ko}</Badge>
-                              ) : (
-                                <span className="text-gray-300">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5 whitespace-nowrap">
-                              <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>
-                                {model.series}
-                              </Badge>
-                            </td>
-                            <td className="px-3 py-2.5 font-mono text-sm text-gray-800 whitespace-nowrap">
-                              {model.code}
-                            </td>
-                            <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
-                              {model.axle || <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
-                              {model.cabin || <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-3 py-2.5 whitespace-nowrap">
-                              {model.badge ? (
-                                <Badge variant={model.badge}>
-                                  {BADGE_LABELS[model.badge] ?? model.badge}
-                                </Badge>
-                              ) : (
-                                <span className="text-gray-300">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              {notes.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {notes.map((n) => (
-                                    <span
-                                      key={n.id}
-                                      className="inline-block text-xs bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded"
-                                    >
-                                      {n.label}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : model.code_desc ? (
-                                <span className="text-xs text-gray-400">{model.code_desc}</span>
-                              ) : (
-                                <span className="text-gray-300 text-xs">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5 font-mono text-xs text-mb-blue font-semibold whitespace-nowrap">
-                              {model.production_month || <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); toggleCompare(model); }}
-                                className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-                                  isSelected
-                                    ? 'bg-mb-blue text-white border-mb-blue'
-                                    : 'text-gray-600 border-gray-300 hover:bg-gray-100'
-                                }`}
-                              >
-                                {isSelected ? '해제' : '비교'}
-                              </button>
-                            </td>
-                            {isAdmin && (
-                              <>
-                                <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                  <span
-                                    className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${
-                                      model.is_visible
-                                        ? 'bg-green-50 text-green-700'
-                                        : 'bg-gray-100 text-gray-500'
-                                    }`}
-                                  >
-                                    {model.is_visible ? '공개' : '숨김'}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); toggleVisibility(model); }}
-                                    className="px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                                  >
-                                    {model.is_visible ? '숨기기' : '공개하기'}
-                                  </button>
-                                </td>
-                                <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                  <div className="flex items-center justify-center gap-0.5">
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); moveModel(model.id, yearModels[idx - 1].id); }}
-                                      disabled={idx === 0 || reordering}
-                                      title="위로 이동"
-                                      className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                                    >
-                                      ↑
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); moveModel(model.id, yearModels[idx + 1].id); }}
-                                      disabled={idx === yearModels.length - 1 || reordering}
-                                      title="아래로 이동"
-                                      className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                                    >
-                                      ↓
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  {normalModels.length > 0 &&
+                    renderListTable(normalModels, null, `${year}-normal`)}
+                  {fleetModels.length > 0 &&
+                    renderListTable(fleetModels, 'Fleet / 주문차', `${year}-fleet`)}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </>
       )}
