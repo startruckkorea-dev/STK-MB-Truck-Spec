@@ -140,6 +140,7 @@
 | [src/lib/graph.js](src/lib/graph.js) | Microsoft Graph REST 호출 (토큰 부착, 429/503 재시도) |
 | [src/lib/workbook.js](src/lib/workbook.js) | 워크북 시트 읽기(usedRange)/쓰기(range PATCH·delete) |
 | [src/lib/sourceFiles.js](src/lib/sourceFiles.js) | SharePoint 견적서(.docx) 원본 폴더 탐색·다운로드 |
+| [src/lib/pictures.js](src/lib/pictures.js) | SharePoint 모델 사진 폴더 자동 매칭·조회(상세 화면 갤러리) |
 | [src/lib/accessList.js](src/lib/accessList.js) | SharePoint `Access` 폴더 접근권한 엑셀(G=이메일, H=권한) 읽기 |
 | [src/lib/codeIndex.js](src/lib/codeIndex.js) | `code_dict` → 코드 인덱스, 사양값 번역 매칭 |
 | [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 데이터 4개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
@@ -240,6 +241,7 @@ VITE_SP_HOSTNAME=startruckkorea.sharepoint.com
 VITE_SP_SITE_PATH=/sites/STK-PMM
 VITE_SP_FOLDER_PATH=mbtruck-spec/Code          # 데이터 워크북(.xlsx) 폴더
 VITE_SP_QUOTATION_PATH=mbtruck-spec/Quotation  # 견적서(.docx) 원본 폴더
+VITE_SP_PICTURES_PATH=mbtruck-spec/Pictures    # 모델 사진 원본 폴더
 VITE_SP_ACCESS_PATH=mbtruck-spec/Access        # 접근권한 엑셀(Access_List_*.xlsx) 폴더
 
 # 앱 타이틀
@@ -264,6 +266,11 @@ VITE_APP_TITLE=...
   - 하위를 MY 연도(`MY26`, `MY27` …) → 생산월(`2026-04` …) 폴더로 구분.
   - 모델 등록 시 이 폴더를 탐색해 .docx 를 바로 선택한다 (앱이 폴더명 무관하게
     트리로 탐색하므로 명명 규칙은 자유, 단 `MY##` 폴더명은 Model Year 자동 입력에 쓰임).
+- 모델 사진 폴더: `Shared Documents/mbtruck-spec/Pictures/`
+  - 하위를 MY 연도(`MY26` …) → **모델명** 폴더로 구분 (`MY26/Actros 2863LS 6x2 G5F`).
+  - 모델명 폴더는 상세 헤더 표기(`시리즈 코드 축 캐빈`)와 **정확히 일치**해야 자동 매칭된다.
+  - 상세 화면 [📷 사진] 버튼이 이 폴더를 조회해 갤러리로 보여준다 (sales 포함 전체 열람).
+    별도 연결/등록 작업 없이 폴더에 이미지를 넣기만 하면 된다. ([src/lib/pictures.js])
 - 앱 사용자는 이 파일 "읽기" 권한, 관리자는 "편집" 권한 필요.
 
 ---

@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import SpecTable from '../components/SpecTable';
+import PhotoGallery from '../components/PhotoGallery';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { useModelDetail } from '../hooks/useModels';
@@ -21,6 +22,8 @@ export default function ModelDetail() {
   // 코드 열람 권한이 있어도 외부 배포용으로 코드를 숨겨 출력하는 옵션
   const [hideCodesExport, setHideCodesExport] = useState(false);
   const exportCodes = canViewCodes && !hideCodesExport;
+  // 사진 갤러리 모달 (sales 포함 전체 열람)
+  const [showPhotos, setShowPhotos] = useState(false);
 
   // initialSpecs(캐시)가 갱신되면 로컬 상태로 동기화
   useEffect(() => {
@@ -116,6 +119,13 @@ export default function ModelDetail() {
               </label>
             )}
             <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowPhotos(true)}
+            >
+              📷 사진
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               onClick={() => exportDetailToExcel(model, specs, dict, notes, lang, exportCodes)}
@@ -166,6 +176,10 @@ export default function ModelDetail() {
         </div>
       ) : (
         <SpecTable specs={specs} dict={dict} language={lang} onToggleHide={isAdmin ? toggleSpecHidden : undefined} />
+      )}
+
+      {showPhotos && (
+        <PhotoGallery model={model} onClose={() => setShowPhotos(false)} />
       )}
     </Layout>
   );
