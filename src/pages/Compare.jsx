@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import { useSpecLang } from '../hooks/useSpecLang';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../hooks/useAuth';
+import { isModelHiddenForSales } from '../lib/modelSort';
 import { exportCompareToExcel, exportCompareToPDF } from '../lib/export';
 
 export default function Compare() {
@@ -14,7 +15,7 @@ export default function Compare() {
   const idCount = idsKey ? idsKey.split(',').length : 0;
 
   const { models: allModels, specs: allSpecs, modelNotes, codeIndex, loading, error } = useData();
-  const { canViewCodes, canExportExcel, user } = useAuth();
+  const { canViewCodes, canExportExcel, isSales, user } = useAuth();
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [lang] = useSpecLang();
   // 코드 열람 권한이 있어도 외부 배포용으로 코드를 숨겨 출력하는 옵션
@@ -26,7 +27,9 @@ export default function Compare() {
     const idList = idsKey.split(',').filter(Boolean).map(Number);
     const ms = idList
       .map((id) => allModels.find((m) => Number(m.id) === id))
-      .filter(Boolean);
+      .filter(Boolean)
+      // sales 는 Fleet 내수·수출 모델을 비교에서 제외
+      .filter((m) => !(isSales && isModelHiddenForSales(m)));
     const sm = {};
     const nm = {};
     ms.forEach((m) => {
@@ -38,7 +41,7 @@ export default function Compare() {
         .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     });
     return { models: ms, specsMap: sm, notesMap: nm };
-  }, [idsKey, allModels, allSpecs, modelNotes]);
+  }, [idsKey, allModels, allSpecs, modelNotes, isSales]);
 
   const dict = codeIndex;
 

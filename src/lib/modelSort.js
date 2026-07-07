@@ -6,6 +6,15 @@
  * model_year(내림차순) → series → code 순서로 정렬한다.
  */
 
+// sales 역할에게는 숨기는 배지 (Fleet 내수·수출 전용 사양).
+// admin·본사직원 A/B 는 그대로 열람한다. (Branch주문차는 대상 아님)
+export const SALES_HIDDEN_BADGES = new Set(['fleet-domestic', 'fleet-export']);
+
+/** sales 역할이 이 모델을 볼 수 있는지 여부 (Fleet 내수·수출은 차단) */
+export function isModelHiddenForSales(model) {
+  return !!model && SALES_HIDDEN_BADGES.has(model.badge);
+}
+
 function hasOrder(v) {
   return v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v));
 }

@@ -1,21 +1,23 @@
 import { useMemo } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from './useAuth';
-import { compareModels } from '../lib/modelSort';
+import { compareModels, isModelHiddenForSales } from '../lib/modelSort';
 
 /**
  * 모델 목록 조회 (SharePoint 캐시 기반)
  * - admin / 본사직원A: is_visible=false 포함 전체
  * - 본사직원B / sales: is_visible=true 만
+ * - sales: 추가로 Fleet 내수·수출 배지 모델은 숨김
  */
 export function useModels() {
   const { models, loading, error, reload } = useData();
-  const { canViewHidden } = useAuth();
+  const { canViewHidden, isSales } = useAuth();
 
   const sorted = useMemo(() => {
-    const list = canViewHidden ? models : models.filter((m) => m.is_visible !== false);
+    let list = canViewHidden ? models : models.filter((m) => m.is_visible !== false);
+    if (isSales) list = list.filter((m) => !isModelHiddenForSales(m));
     return [...list].sort(compareModels);
-  }, [models, canViewHidden]);
+  }, [models, canViewHidden, isSales]);
 
   return { models: sorted, loading, error, refetch: reload };
 }
@@ -25,12 +27,15 @@ export function useModels() {
  */
 export function useModelDetail(id) {
   const { models, specs, modelNotes, loading, error } = useData();
+  const { isSales } = useAuth();
   const modelId = Number(id);
 
-  const model = useMemo(
-    () => models.find((m) => Number(m.id) === modelId) || null,
-    [models, modelId]
-  );
+  // sales 는 Fleet 내수·수출 모델을 직접 URL 로도 열람할 수 없다(null 처리).
+  const model = useMemo(() => {
+    const found = models.find((m) => Number(m.id) === modelId) || null;
+    if (found && isSales && isModelHiddenForSales(found)) return null;
+    return found;
+  }, [models, modelId, isSales]);
 
   const modelSpecs = useMemo(
     () =>
