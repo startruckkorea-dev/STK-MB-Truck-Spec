@@ -60,6 +60,18 @@ export default function Layout({ children }) {
               >
                 모델 목록
               </NavLink>
+              <NavLink
+                to="/colors"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-mb-blue text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`
+                }
+              >
+                색상코드
+              </NavLink>
               {isAdmin && (
                 <NavLink
                   to="/admin/models"
@@ -151,6 +163,19 @@ export default function Layout({ children }) {
                 }
               >
                 모델 목록
+              </NavLink>
+              <NavLink
+                to="/colors"
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-mb-blue text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`
+                }
+              >
+                색상코드
               </NavLink>
               {isAdmin && (
                 <NavLink
