@@ -3,9 +3,12 @@ import Layout from '../../components/Layout';
 import Button from '../../components/ui/Button';
 import Toggle from '../../components/ui/Toggle';
 import ExcelImport from '../../components/admin/ExcelImport';
+import ImageLightbox from '../../components/ImageLightbox';
 import { useDict } from '../../hooks/useDict';
 import { useAuth } from '../../hooks/useAuth';
-import { isShortCode } from '../../lib/codeIndex';
+import { useData } from '../../contexts/DataContext';
+import { isShortCode, normCode } from '../../lib/codeIndex';
+import { specImageFolderPath } from '../../lib/specImages';
 
 const CATEGORY_OPTIONS = [
   '엔진', '변속기', '차축', '서스펜션', '타이어/휠', '캡', '외장 컬러',
@@ -41,11 +44,17 @@ export default function AdminDict() {
   } = useDict();
   // 본사직원A(canEditDict=false)는 읽기 전용 — 편집/삭제/엑셀열기/다시불러오기 불가
   const { canEditDict } = useAuth();
+  // 사양 이미지 인덱스 (spec_picture 폴더: 파일명=코드명 매칭)
+  const { specImageIndex, reloadSpecImages } = useData();
 
   const [modal, setModal] = useState(null); // null | 'new' | item
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [preview, setPreview] = useState(null); // 이미지 확대 보기: { src, caption } | null
+
+  // 코드에 매칭되는 사양 이미지 반환 (없으면 null)
+  const imageForCode = (code) => specImageIndex[normCode(code)] || null;
 
   function openNew(prefillCode = '') {
     setForm({ ...EMPTY_FORM, code: prefillCode });
@@ -105,6 +114,19 @@ export default function AdminDict() {
         <p className="text-gray-500 text-xs sm:text-sm mt-1">
           {mode === 'updated' ? `등록 모델 사용 코드 ${total.toLocaleString()}개` : `총 ${total.toLocaleString()}개 코드`}
         </p>
+        {/* 사양 이미지 안내: SharePoint 폴더에 '코드명.jpg' 로 넣으면 자동 매칭 */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+          <span>
+            사양 이미지: <span className="font-mono text-gray-500">{specImageFolderPath()}</span> 폴더에{' '}
+            <span className="font-mono text-gray-500">코드명.jpg</span> 로 저장하면 자동 매칭됩니다.
+          </span>
+          <button
+            onClick={reloadSpecImages}
+            className="px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-50 text-gray-500 transition-colors"
+          >
+            이미지 다시 불러오기
+          </button>
+        </div>
       </div>
 
       {/* 엑셀 가져오기 (관리자 전용 — 엑셀열기/다시불러오기) */}
@@ -188,6 +210,7 @@ export default function AdminDict() {
               <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">카테고리</th>
               <th className="text-center px-4 py-3 text-gray-500 font-medium w-20">컬러</th>
               <th className="text-center px-4 py-3 text-gray-500 font-medium w-20">숨김</th>
+              <th className="text-center px-4 py-3 text-gray-500 font-medium w-20">이미지</th>
               <th className="text-right px-4 py-3 text-gray-500 font-medium w-20">액션</th>
             </tr>
           </thead>
@@ -203,6 +226,9 @@ export default function AdminDict() {
                 <td className="px-4 py-2.5 text-amber-400 text-xs hidden md:table-cell">—</td>
                 <td className="px-4 py-2.5 text-center">—</td>
                 <td className="px-4 py-2.5 text-center">—</td>
+                <td className="px-4 py-2.5 text-center">
+                  <ImageCell img={imageForCode(code)} onPreview={setPreview} caption={code} />
+                </td>
                 <td className="px-4 py-2.5 text-right">
                   {canEditDict && (
                     <button
@@ -217,11 +243,11 @@ export default function AdminDict() {
             ))}
             {loading ? (
               <tr>
-                <td colSpan={7} className="text-center py-10 text-gray-400 animate-pulse">로딩 중...</td>
+                <td colSpan={8} className="text-center py-10 text-gray-400 animate-pulse">로딩 중...</td>
               </tr>
             ) : items.length === 0 && unregisteredCodes.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-10 text-gray-400">검색 결과가 없습니다.</td>
+                <td colSpan={8} className="text-center py-10 text-gray-400">검색 결과가 없습니다.</td>
               </tr>
             ) : items.map((item) => {
               const d = getDisplayFields(item);
@@ -255,6 +281,9 @@ export default function AdminDict() {
                   ) : (
                     <span className="text-xs text-gray-400">{item.is_hidden ? '숨김' : '표시'}</span>
                   )}
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  <ImageCell img={imageForCode(d.shortCode)} onPreview={setPreview} caption={d.shortCode} />
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   {canEditDict && (
@@ -351,14 +380,17 @@ export default function AdminDict() {
               <span className="font-mono text-xs font-semibold text-amber-800">{code}</span>
               <p className="text-xs text-amber-600 mt-0.5">번역 미등록</p>
             </div>
-            {canEditDict && (
-              <button
-                onClick={() => openNew(code)}
-                className="px-2 py-1 text-xs text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors flex-shrink-0"
-              >
-                등록
-              </button>
-            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <ImageCell img={imageForCode(code)} onPreview={setPreview} caption={code} />
+              {canEditDict && (
+                <button
+                  onClick={() => openNew(code)}
+                  className="px-2 py-1 text-xs text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors"
+                >
+                  등록
+                </button>
+              )}
+            </div>
           </div>
         ))}
         {loading ? (
@@ -387,6 +419,9 @@ export default function AdminDict() {
                 {d.engName && (
                   <div className="text-xs text-gray-400 mt-0.5">{d.engName}</div>
                 )}
+                <div className="mt-1">
+                  <ImageCell img={imageForCode(d.shortCode)} onPreview={setPreview} caption={d.shortCode} hideEmpty />
+                </div>
               </div>
               {canEditDict && (
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -562,6 +597,34 @@ export default function AdminDict() {
           </div>
         </div>
       )}
+
+      {/* 사양 이미지 확대 보기 */}
+      {preview && (
+        <ImageLightbox
+          src={preview.src}
+          alt={preview.caption}
+          caption={preview.caption}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </Layout>
+  );
+}
+
+/**
+ * 코드별 사양 이미지 셀 — 이미지가 있으면 [보기] 버튼, 없으면 '—'(또는 hideEmpty 시 미표시).
+ */
+function ImageCell({ img, onPreview, caption, hideEmpty = false }) {
+  if (!img) {
+    return hideEmpty ? null : <span className="text-gray-300 text-xs">—</span>;
+  }
+  return (
+    <button
+      onClick={() => onPreview({ src: img.fullUrl || img.thumbUrl, caption })}
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-mb-blue border border-mb-blue/40 rounded hover:bg-mb-blue hover:text-white transition-colors"
+      title="사양 이미지 보기"
+    >
+      🖼 보기
+    </button>
   );
 }

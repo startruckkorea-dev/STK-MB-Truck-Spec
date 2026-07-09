@@ -141,6 +141,7 @@
 | [src/lib/workbook.js](src/lib/workbook.js) | 워크북 시트 읽기(usedRange)/쓰기(range PATCH·delete) |
 | [src/lib/sourceFiles.js](src/lib/sourceFiles.js) | SharePoint 견적서(.docx) 원본 폴더 탐색·다운로드 |
 | [src/lib/pictures.js](src/lib/pictures.js) | SharePoint 모델 사진 폴더 자동 매칭·조회(상세 화면 갤러리) |
+| [src/lib/specImages.js](src/lib/specImages.js) | SharePoint `spec_picture` 폴더 조회 → 코드별 사양 이미지 인덱스(파일명=코드명 매칭). 상세 사양행 [보기] 버튼·코드사전 미리보기에 사용 |
 | [src/lib/accessList.js](src/lib/accessList.js) | SharePoint `Access` 폴더 접근권한 엑셀(G=이메일, H=권한) 읽기 |
 | [src/lib/codeIndex.js](src/lib/codeIndex.js) | `code_dict` → 코드 인덱스, 사양값 번역 매칭 |
 | [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 데이터 4개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
@@ -242,6 +243,7 @@ VITE_SP_SITE_PATH=/sites/STK-PMM
 VITE_SP_FOLDER_PATH=mbtruck-spec/Code          # 데이터 워크북(.xlsx) 폴더
 VITE_SP_QUOTATION_PATH=mbtruck-spec/Quotation  # 견적서(.docx) 원본 폴더
 VITE_SP_PICTURES_PATH=mbtruck-spec/Pictures    # 모델 사진 원본 폴더
+VITE_SP_SPEC_PICTURES_PATH=mbtruck-spec/spec_picture  # 사양 코드별 이미지 폴더(파일명=코드명)
 VITE_SP_ACCESS_PATH=mbtruck-spec/Access        # 접근권한 엑셀(Access_List_*.xlsx) 폴더
 
 # 앱 타이틀
@@ -275,6 +277,12 @@ VITE_APP_TITLE=...
     (사진 없을 때 갤러리에 권장 폴더명이 표시되니 그대로 만들면 된다.)
   - 상세 화면 [📷 사진] 버튼이 이 폴더를 조회해 갤러리로 보여준다 (sales 포함 전체 열람).
     별도 연결/등록 작업 없이 폴더에 이미지를 넣기만 하면 된다. ([src/lib/pictures.js])
+- 사양 코드별 이미지 폴더: `Shared Documents/mbtruck-spec/spec_picture/` (평면 폴더)
+  - **파일명 = 코드명** 규칙으로 자동 매칭 (`A0A.jpg`, `w68k96 80.png` … 대소문자·확장자 무관).
+  - 사양 상세 각 행에서, 해당 코드의 이미지가 폴더에 있으면 값 오른쪽에 [🖼 보기] 버튼이
+    뜨고 클릭 시 확대 표시된다 (sales 포함 전체 열람, **출력·Excel·PDF 에는 미포함**).
+  - 코드사전(`/admin/dict`)에 코드별 이미지 유무 표시·미리보기가 있다(파일은 폴더에 직접 넣음,
+    앱 내 업로드 없음). 새 파일 반영은 상단 [이미지 다시 불러오기]. ([src/lib/specImages.js])
 - 앱 사용자는 이 파일 "읽기" 권한, 관리자는 "편집" 권한 필요.
 
 ---

@@ -37,7 +37,7 @@ export default function ModelDetail() {
   const { id } = useParams();
   const { isAdmin, canViewCodes, canExportExcel, user } = useAuth();
   const { model, specs: initialSpecs, notes, loading, error } = useModelDetail(id);
-  const { codeIndex: dict, setSpecHidden } = useData();
+  const { codeIndex: dict, specImageIndex, setSpecHidden } = useData();
   const [specs, setSpecs] = useState([]);
   const [lang] = useSpecLang();
   // 코드 열람 권한이 있어도 외부 배포용으로 코드를 숨겨 출력하는 옵션
@@ -200,7 +200,7 @@ export default function ModelDetail() {
           등록된 사양이 없습니다.
         </div>
       ) : (
-        <SpecTable specs={specs} dict={dict} language={lang} onToggleHide={isAdmin ? toggleSpecHidden : undefined} />
+        <SpecTable specs={specs} dict={dict} imageIndex={specImageIndex} language={lang} onToggleHide={isAdmin ? toggleSpecHidden : undefined} />
       )}
 
       {showPhotos && (

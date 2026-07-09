@@ -1,16 +1,21 @@
 import { useState } from 'react';
 import ColorSwatch from './ColorSwatch';
+import ImageLightbox from './ImageLightbox';
 import { useAuth } from '../hooks/useAuth';
+import { normCode } from '../lib/codeIndex';
 
 /**
  * 카테고리별 접이식 사양 테이블
  *
  * specs: [{ category, spec_key, spec_value, label_ko, use_translate, is_color, is_hidden }]
  * dict:  { [code]: { name_ko, hex_color, is_hidden, category } }
+ * imageIndex: { [정규화코드]: { name, thumbUrl, fullUrl } }  — 사양 이미지(spec_picture)
  * onToggleHide: (specId, currentIsHidden) => void  — admin 전용 인라인 숨김 토글
  */
-export default function SpecTable({ specs, dict, language = 'ko', onToggleHide }) {
+export default function SpecTable({ specs, dict, imageIndex = {}, language = 'ko', onToggleHide }) {
   const { isAdmin, canViewCodes } = useAuth();
+  // 사양 이미지 확대 보기 라이트박스
+  const [preview, setPreview] = useState(null); // { src, caption } | null
 
   // 카테고리별 그룹핑
   const groups = groupByCategory(specs);
@@ -23,17 +28,27 @@ export default function SpecTable({ specs, dict, language = 'ko', onToggleHide }
           category={category}
           items={items}
           dict={dict}
+          imageIndex={imageIndex}
           language={language}
           isAdmin={isAdmin}
           canViewCodes={canViewCodes}
           onToggleHide={onToggleHide}
+          onPreview={setPreview}
         />
       ))}
+      {preview && (
+        <ImageLightbox
+          src={preview.src}
+          alt={preview.caption}
+          caption={preview.caption}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 }
 
-function CategoryGroup({ category, items, dict, language, isAdmin, canViewCodes, onToggleHide }) {
+function CategoryGroup({ category, items, dict, imageIndex, language, isAdmin, canViewCodes, onToggleHide, onPreview }) {
   const [open, setOpen] = useState(true);
 
   // 숨겨진 항목 개수 (sales는 아예 렌더 안 함)
@@ -117,6 +132,22 @@ function CategoryGroup({ category, items, dict, language, isAdmin, canViewCodes,
                 <div className="text-gray-900 flex-1 min-w-0">
                   {displayValue}
                 </div>
+                {(() => {
+                  const img = imageIndex[normCode(spec.spec_value)];
+                  if (!img) return null;
+                  return (
+                    <button
+                      onClick={() =>
+                        onPreview({ src: img.fullUrl || img.thumbUrl, caption: spec.spec_value })
+                      }
+                      className="print:hidden flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-mb-blue border border-mb-blue/40 rounded hover:bg-mb-blue hover:text-white transition-colors"
+                      title="관련 이미지 보기"
+                    >
+                      <ImageIcon />
+                      보기
+                    </button>
+                  );
+                })()}
                 {isAdmin && onToggleHide && (
                   <button
                     onClick={() => onToggleHide(spec.id, spec.is_hidden)}
@@ -150,6 +181,16 @@ function groupByCategory(specs) {
 }
 
 // ─── 인라인 SVG 아이콘 ────────────────────────────────────────────
+function ImageIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="M21 15l-5-5L5 21" />
+    </svg>
+  );
+}
+
 function EyeIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

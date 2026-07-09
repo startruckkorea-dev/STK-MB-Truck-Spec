@@ -11,6 +11,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, us
 import { useAuth } from '../hooks/useAuth';
 import * as wb from '../lib/workbook';
 import { buildCodeIndex } from '../lib/codeIndex';
+import { listSpecImages } from '../lib/specImages';
 import { compareModels } from '../lib/modelSort';
 
 const DataContext = createContext(null);
@@ -27,6 +28,8 @@ export function DataProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  // 사양 이미지 인덱스 (spec_picture 폴더: 정규화코드 → { name, thumbUrl, fullUrl })
+  const [specImageIndex, setSpecImageIndex] = useState({});
 
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -64,6 +67,19 @@ export function DataProvider({ children }) {
     if (userId && !loaded) reload();
     if (!userId) setLoading(false);
   }, [userId, loaded, reload]);
+
+  // ─── 사양 이미지 인덱스 로드 (폴더 조회, 실패해도 앱 정상 동작) ──────
+  const reloadSpecImages = useCallback(async () => {
+    try {
+      setSpecImageIndex(await listSpecImages());
+    } catch {
+      setSpecImageIndex({});
+    }
+  }, []);
+
+  useEffect(() => {
+    if (userId) reloadSpecImages();
+  }, [userId, reloadSpecImages]);
 
   // ─── 동시편집 검증 (단건 쓰기 전 해당 행이 그대로인지 확인) ─────────
   async function verifyIndex(sheet, idx, expectedId) {
@@ -226,6 +242,8 @@ export function DataProvider({ children }) {
   const value = {
     ...state,
     codeIndex,
+    specImageIndex,
+    reloadSpecImages,
     loading,
     error,
     reload,
