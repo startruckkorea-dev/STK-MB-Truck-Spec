@@ -189,7 +189,14 @@ export default function ColorCodes() {
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm table-fixed min-w-[640px]">
+                  {/* MY별 표 열 너비 통일 (차종·모델명·색상코드·색상명) */}
+                  <colgroup>
+                    <col className="w-[14%]" />
+                    <col className="w-[34%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[34%]" />
+                  </colgroup>
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50 text-left text-gray-500">
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">차종</th>

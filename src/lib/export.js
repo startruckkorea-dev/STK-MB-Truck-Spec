@@ -512,6 +512,23 @@ function openPrintWindow(title, bodyHtml, { landscape = false, userEmail = '' } 
     return;
   }
 
+  // ── 페이지 크기/여백 (mm) ──
+  const MARGIN_MM = 10;   // @page 여백
+  const HEADER_MM = 20;   // 각 페이지 상단 머리글 밴드
+  const FOOTER_MM = 9;    // 각 페이지 하단 바닥글 밴드
+  const pageWmm = landscape ? 297 : 210;
+  const pageHmm = landscape ? 210 : 297;
+  const printableHmm = pageHmm - 2 * MARGIN_MM;
+  const contentHmm = printableHmm - HEADER_MM - FOOTER_MM;
+  const contentWmm = pageWmm - 2 * MARGIN_MM;
+  const MMPX = 96 / 25.4;
+  const contentWpx = Math.round(contentWmm * MMPX);
+  const contentHpx = Math.floor(contentHmm * MMPX) - 16; // 안전 여유 (page-body 상단 패딩 10px + 반올림)
+
+  const dateStr = new Date().toLocaleDateString('ko-KR');
+  const dateLine = '생성일: ' + dateStr + (userEmail ? ' · 출력자: ' + esc(userEmail) : '');
+  const logoSrc = window.location.origin + LOGO_URL;
+
   w.document.write(`<!DOCTYPE html>
 <html>
 <head>
@@ -520,44 +537,60 @@ function openPrintWindow(title, bodyHtml, { landscape = false, userEmail = '' } 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Roboto+Mono:wght@400&display=swap');
 
-  ${landscape ? '@page { size: A4 landscape; margin: 12mm; }' : '@page { size: A4; margin: 15mm; }'}
+  @page { size: A4${landscape ? ' landscape' : ''}; margin: ${MARGIN_MM}mm; }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
     font-family: 'Noto Sans KR', sans-serif;
-    background: #fff;
     color: #1a1a1a;
-    padding: 24px;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .logo {
-    text-align: center;
-    margin-bottom: 4px;
+  /* ── 페이지 컨테이너 (JS 페이지네이터가 채운다) ── */
+  .page {
+    width: 100%;
+    height: ${printableHmm}mm;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    break-before: page;
+    page-break-before: always;
   }
-  .logo img {
-    height: 60px;
-    width: auto;
-  }
+  .page:first-child { break-before: auto; page-break-before: auto; }
 
-  .header {
+  .page-header {
+    flex: 0 0 ${HEADER_MM}mm;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     border-bottom: 3px solid #00ADEF;
-    padding: 16px 0 12px;
-    margin-bottom: 20px;
+    padding-bottom: 6px;
   }
-  .header h1 {
-    font-family: 'Noto Sans KR', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    color: #1a1a1a;
+  .ph-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .ph-logo { height: 34px; width: auto; flex: 0 0 auto; }
+  .ph-title { font-size: 15px; font-weight: 700; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ph-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: 0 0 auto; }
+  .ph-conf { color: #d40000; border: 2px solid #d40000; border-radius: 4px; padding: 1px 8px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; }
+  .ph-date { font-size: 10px; color: #6b7280; white-space: nowrap; }
+
+  .page-body { flex: 1 1 auto; overflow: hidden; padding-top: 10px; }
+
+  .page-footer {
+    flex: 0 0 ${FOOTER_MM}mm;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 4px;
+    font-size: 9px;
+    color: #9ca3af;
   }
-  .header .date {
-    font-size: 11px;
-    color: #6b7280;
-    margin-top: 4px;
-  }
+  .pf-left { justify-self: start; font-weight: 600; color: #6b7280; letter-spacing: .5px; }
+  .pf-num { justify-self: center; color: #4b5563; font-variant-numeric: tabular-nums; }
 
   .category {
     font-family: 'Noto Sans KR', sans-serif;
@@ -603,44 +636,20 @@ function openPrintWindow(title, bodyHtml, { landscape = false, userEmail = '' } 
   tbody tr.diff td { color: #1e40af; }
   td.code, .code { font-family: 'Roboto Mono', monospace; font-size: 10px; color: #4b5563; }
 
-  .footer {
-    text-align: center;
-    font-size: 9px;
-    color: #9ca3af;
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 1px solid #e5e7eb;
-  }
+  .toolbar { text-align: center; padding: 16px; }
 
-  /* 기밀 표기 — position:fixed 는 인쇄 시 페이지마다 반복된다 */
-  .confidential {
-    position: fixed;
-    top: 6mm;
-    right: 6mm;
-    color: #d40000;
-    border: 2px solid #d40000;
-    padding: 2px 10px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    border-radius: 4px;
-    z-index: 1000;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  @media screen {
+    body { background: #e5e7eb; }
+    #pages { width: ${pageWmm}mm; margin: 0 auto; }
+    .page { background: #fff; height: ${pageHmm}mm; padding: ${MARGIN_MM}mm; margin: 0 auto 16px; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
   }
-
   @media print {
-    body { padding: 0; }
     .no-print { display: none !important; }
-    .header { break-after: avoid; }
-    table { break-inside: auto; }
-    tr { break-inside: avoid; }
-    .confidential { position: fixed; }
   }
 </style>
 </head>
 <body>
-  <div class="no-print" style="text-align:center;margin-bottom:16px;">
+  <div class="no-print toolbar">
     <button onclick="window.print()" style="
       background:#00ADEF;color:#fff;border:none;padding:10px 32px;
       border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;
@@ -650,16 +659,121 @@ function openPrintWindow(title, bodyHtml, { landscape = false, userEmail = '' } 
       인쇄 대화상자에서 "PDF로 저장"을 선택하세요
     </span>
   </div>
-  <div class="confidential">CONFIDENTIAL</div>
-  <div class="logo">
-    <img src="${window.location.origin}${LOGO_URL}" alt="logo" />
-  </div>
-  <div class="header">
-    <h1>${esc(title)}</h1>
-    <div class="date">생성일: ${new Date().toLocaleDateString('ko-KR')}${userEmail ? ` &nbsp;·&nbsp; 출력자: ${esc(userEmail)}` : ''}</div>
-  </div>
-  ${bodyHtml}
-  <div class="footer">Star Truck Korea</div>
+  <div id="doc">${bodyHtml}</div>
+  <div id="pages"></div>
+<script>
+(function(){
+  var LANDSCAPE = ${landscape ? 'true' : 'false'};
+  var TITLE = ${JSON.stringify(esc(title))};
+  var DATELINE = ${JSON.stringify(esc(dateLine))};
+  var LOGO_SRC = ${JSON.stringify(logoSrc)};
+  var CONTENT_W = ${contentWpx};
+  var CONTENT_H = ${contentHpx};
+
+  function run(){
+    try {
+      var pages = document.getElementById('pages');
+      var doc = document.getElementById('doc');
+      // 실제 인쇄 폭으로 측정
+      doc.style.position = 'absolute';
+      doc.style.left = '-99999px';
+      doc.style.top = '0';
+      doc.style.width = CONTENT_W + 'px';
+
+      var blocks = Array.prototype.slice.call(doc.children);
+      var cur = null, used = 0, footers = [];
+
+      function makeHeader(){
+        var h = document.createElement('div'); h.className = 'page-header';
+        h.innerHTML =
+          '<div class="ph-left"><img class="ph-logo" src="' + LOGO_SRC + '"><span class="ph-title">' + TITLE + '</span></div>' +
+          '<div class="ph-right"><div class="ph-conf">CONFIDENTIAL</div><div class="ph-date">' + DATELINE + '</div></div>';
+        return h;
+      }
+      function makeFooter(){
+        var f = document.createElement('div'); f.className = 'page-footer';
+        f.innerHTML = '<div class="pf-left">Star Truck Korea</div><div class="pf-num"></div><div class="pf-right"></div>';
+        return f;
+      }
+      function newPage(){
+        var p = document.createElement('div'); p.className = 'page';
+        var b = document.createElement('div'); b.className = 'page-body';
+        var f = makeFooter();
+        p.appendChild(makeHeader()); p.appendChild(b); p.appendChild(f);
+        pages.appendChild(p); footers.push(f); cur = b; used = 0; return b;
+      }
+      function makeFrag(src){
+        var t = document.createElement('table'); t.className = src.className;
+        var cg = src.querySelector('colgroup'); if (cg) t.appendChild(cg.cloneNode(true));
+        var th = src.querySelector('thead'); if (th) t.appendChild(th.cloneNode(true));
+        t.appendChild(document.createElement('tbody'));
+        return t;
+      }
+      function outerH(el){
+        var r = el.getBoundingClientRect();
+        var s = window.getComputedStyle(el);
+        return r.height + (parseFloat(s.marginTop) || 0) + (parseFloat(s.marginBottom) || 0);
+      }
+
+      newPage();
+
+      for (var bi = 0; bi < blocks.length; bi++){
+        var block = blocks[bi];
+        if (block.tagName !== 'TABLE'){
+          // 카테고리 등 일반 블록 — 뒤따르는 표의 머리글+첫 행과 함께 유지
+          var bh = outerH(block);
+          var need = bh;
+          var nxt = blocks[bi + 1];
+          if (nxt && nxt.tagName === 'TABLE'){
+            var nth = nxt.querySelector('thead');
+            var ntb = nxt.querySelector('tbody');
+            var r0 = ntb && ntb.rows[0];
+            need += (nth ? nth.getBoundingClientRect().height : 0) + (r0 ? r0.getBoundingClientRect().height : 0);
+          }
+          if (used > 0 && used + need > CONTENT_H) newPage();
+          cur.appendChild(block.cloneNode(true));
+          used += bh;
+        } else {
+          var thead = block.querySelector('thead');
+          var headH = thead ? thead.getBoundingClientRect().height : 0;
+          var tbody = block.querySelector('tbody');
+          var rows = tbody ? Array.prototype.slice.call(tbody.rows) : [];
+          var frag = null;
+          for (var ri = 0; ri < rows.length; ri++){
+            var row = rows[ri];
+            var rh = row.getBoundingClientRect().height;
+            if (frag === null){
+              if (used > 0 && used + headH + rh > CONTENT_H) newPage();
+              frag = makeFrag(block); cur.appendChild(frag); used += headH;
+            } else if (used + rh > CONTENT_H){
+              newPage(); frag = makeFrag(block); cur.appendChild(frag); used += headH;
+            }
+            frag.tBodies[0].appendChild(row.cloneNode(true));
+            used += rh;
+          }
+          if (frag) used += 12; // 표 하단 여백
+        }
+      }
+
+      var total = pages.children.length;
+      for (var i = 0; i < footers.length; i++){
+        footers[i].querySelector('.pf-num').textContent = (i + 1) + ' / ' + total;
+      }
+      doc.parentNode.removeChild(doc);
+    } catch (e){
+      // 폴백: 페이지네이션 실패 시 원본을 그대로 노출
+      var d = document.getElementById('doc');
+      var p = document.getElementById('pages');
+      if (d){ d.style.position = ''; d.style.left = ''; d.style.top = ''; d.style.width = ''; }
+      if (p && p.parentNode) p.parentNode.removeChild(p);
+      if (window.console) console.error('pagination failed', e);
+    }
+  }
+
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(run); }
+  else { window.addEventListener('load', run); }
+})();
+</script>
 </body>
 </html>`);
   w.document.close();
