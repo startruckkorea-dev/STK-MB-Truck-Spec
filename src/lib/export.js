@@ -514,7 +514,7 @@ function openPrintWindow(title, bodyHtml, { landscape = false, userEmail = '' } 
 
   // ── 페이지 크기/여백 (mm) ──
   const MARGIN_MM = 10;   // @page 여백
-  const HEADER_MM = 20;   // 각 페이지 상단 머리글 밴드
+  const HEADER_MM = 28;   // 각 페이지 상단 머리글 밴드 (로고 중앙 + 제목 + 날짜)
   const FOOTER_MM = 9;    // 각 페이지 하단 바닥글 밴드
   const pageWmm = landscape ? 297 : 210;
   const pageHmm = landscape ? 210 : 297;
@@ -561,21 +561,24 @@ function openPrintWindow(title, bodyHtml, { landscape = false, userEmail = '' } 
   }
   .page:first-child { break-before: auto; page-break-before: auto; }
 
+  /* 스타 로고 상단 중앙 (회사 규정) · 제목은 줄바꿈 허용해 생략표시 없음 */
   .page-header {
+    position: relative;
     flex: 0 0 ${HEADER_MM}mm;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: center;
+    gap: 5px;
+    text-align: center;
     border-bottom: 3px solid #00ADEF;
-    padding-bottom: 6px;
+    padding: 2px 12px 8px;
+    overflow: hidden;
   }
-  .ph-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .ph-logo { height: 34px; width: auto; flex: 0 0 auto; }
-  .ph-title { font-size: 15px; font-weight: 700; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ph-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: 0 0 auto; }
-  .ph-conf { color: #d40000; border: 2px solid #d40000; border-radius: 4px; padding: 1px 8px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; }
-  .ph-date { font-size: 10px; color: #6b7280; white-space: nowrap; }
+  .ph-logo { height: 34px; width: auto; }
+  .ph-title { font-size: 14px; font-weight: 700; color: #1a1a1a; line-height: 1.25; max-width: 100%; word-break: keep-all; }
+  .ph-date { font-size: 10px; color: #6b7280; }
+  .ph-conf { position: absolute; top: 0; right: 0; color: #d40000; border: 2px solid #d40000; border-radius: 4px; padding: 1px 8px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; }
 
   .page-body { flex: 1 1 auto; overflow: hidden; padding-top: 10px; }
 
@@ -686,8 +689,10 @@ function openPrintWindow(title, bodyHtml, { landscape = false, userEmail = '' } 
       function makeHeader(){
         var h = document.createElement('div'); h.className = 'page-header';
         h.innerHTML =
-          '<div class="ph-left"><img class="ph-logo" src="' + LOGO_SRC + '"><span class="ph-title">' + TITLE + '</span></div>' +
-          '<div class="ph-right"><div class="ph-conf">CONFIDENTIAL</div><div class="ph-date">' + DATELINE + '</div></div>';
+          '<div class="ph-conf">CONFIDENTIAL</div>' +
+          '<img class="ph-logo" src="' + LOGO_SRC + '">' +
+          '<div class="ph-title">' + TITLE + '</div>' +
+          '<div class="ph-date">' + DATELINE + '</div>';
         return h;
       }
       function makeFooter(){
