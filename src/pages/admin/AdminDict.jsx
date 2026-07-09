@@ -8,7 +8,7 @@ import { useDict } from '../../hooks/useDict';
 import { useAuth } from '../../hooks/useAuth';
 import { useData } from '../../contexts/DataContext';
 import { isShortCode, normCode } from '../../lib/codeIndex';
-import { specImageFolderPath } from '../../lib/specImages';
+import { specImageFolderPath, uploadSpecImage, deleteSpecImageByName } from '../../lib/specImages';
 
 const CATEGORY_OPTIONS = [
   '엔진', '변속기', '차축', '서스펜션', '타이어/휠', '캡', '외장 컬러',
@@ -52,13 +52,55 @@ export default function AdminDict() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [preview, setPreview] = useState(null); // 이미지 확대 보기: { src, caption } | null
+  const [imgBusy, setImgBusy] = useState(false); // 이미지 업로드/삭제 진행중
+  const [imgError, setImgError] = useState('');
 
   // 코드에 매칭되는 사양 이미지 반환 (없으면 null)
   const imageForCode = (code) => specImageIndex[normCode(code)] || null;
 
+  // 편집 모달에서 파일 선택 → spec_picture 폴더에 '코드명.확장자' 로 업로드
+  async function handleImageSelect(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // 같은 파일 재선택 허용
+    if (!file) return;
+    const code = form.code.trim();
+    if (!code) {
+      setImgError('코드를 먼저 입력해 주세요.');
+      return;
+    }
+    setImgBusy(true);
+    setImgError('');
+    try {
+      // 확장자가 다른 기존 이미지가 있으면 교체 전 삭제 (중복 파일 방지)
+      const existing = specImageIndex[normCode(code)];
+      if (existing) await deleteSpecImageByName(existing.name);
+      await uploadSpecImage(code, file);
+      await reloadSpecImages();
+    } catch (err) {
+      setImgError(err.message || '이미지 업로드에 실패했습니다.');
+    }
+    setImgBusy(false);
+  }
+
+  async function handleImageDelete() {
+    const existing = imageForCode(form.code);
+    if (!existing) return;
+    if (!window.confirm(`"${existing.name}" 이미지를 삭제하시겠습니까?`)) return;
+    setImgBusy(true);
+    setImgError('');
+    try {
+      await deleteSpecImageByName(existing.name);
+      await reloadSpecImages();
+    } catch (err) {
+      setImgError(err.message || '이미지 삭제에 실패했습니다.');
+    }
+    setImgBusy(false);
+  }
+
   function openNew(prefillCode = '') {
     setForm({ ...EMPTY_FORM, code: prefillCode });
     setFormError('');
+    setImgError('');
     setModal('new');
   }
 
@@ -73,6 +115,7 @@ export default function AdminDict() {
       is_hidden: item.is_hidden,
     });
     setFormError('');
+    setImgError('');
     setModal('edit');
   }
 
@@ -570,6 +613,78 @@ export default function AdminDict() {
                 />
               </div>
             </div>
+            {/* 사양 이미지 — spec_picture 폴더에 '코드명.확장자' 로 업로드/삭제 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                사양 이미지 (선택)
+              </label>
+              {(() => {
+                const current = imageForCode(form.code);
+                return (
+                  <div className="flex items-center gap-3">
+                    {current ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreview({
+                            src: current.fullUrl || current.thumbUrl,
+                            caption: form.code,
+                          })
+                        }
+                        className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex-shrink-0 hover:border-mb-blue"
+                        title="확대 보기"
+                      >
+                        <img
+                          src={current.thumbUrl || current.fullUrl}
+                          alt={current.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-2xl flex-shrink-0">
+                        🖼
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap gap-2">
+                        <label
+                          className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-colors ${
+                            imgBusy
+                              ? 'opacity-50 pointer-events-none border-gray-300 text-gray-400'
+                              : 'border-mb-blue text-mb-blue hover:bg-mb-blue hover:text-white'
+                          }`}
+                        >
+                          {imgBusy ? '처리 중...' : current ? '이미지 교체' : '이미지 선택'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={imgBusy}
+                            onChange={handleImageSelect}
+                          />
+                        </label>
+                        {current && !imgBusy && (
+                          <button
+                            type="button"
+                            onClick={handleImageDelete}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            삭제
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1 truncate">
+                        {current ? current.name : `저장 시 파일명: ${form.code.trim() || '코드명'}.jpg`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+              {imgError && (
+                <p className="text-xs text-red-600 mt-1.5">{imgError}</p>
+              )}
+            </div>
+
             <Toggle
               checked={form.is_hidden}
               onChange={(v) => setForm((f) => ({ ...f, is_hidden: v }))}

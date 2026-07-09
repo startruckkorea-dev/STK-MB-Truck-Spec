@@ -141,7 +141,7 @@
 | [src/lib/workbook.js](src/lib/workbook.js) | 워크북 시트 읽기(usedRange)/쓰기(range PATCH·delete) |
 | [src/lib/sourceFiles.js](src/lib/sourceFiles.js) | SharePoint 견적서(.docx) 원본 폴더 탐색·다운로드 |
 | [src/lib/pictures.js](src/lib/pictures.js) | SharePoint 모델 사진 폴더 자동 매칭·조회(상세 화면 갤러리) |
-| [src/lib/specImages.js](src/lib/specImages.js) | SharePoint `spec_picture` 폴더 조회 → 코드별 사양 이미지 인덱스(파일명=코드명 매칭). 상세 사양행 [보기] 버튼·코드사전 미리보기에 사용 |
+| [src/lib/specImages.js](src/lib/specImages.js) | SharePoint `spec_picture` 폴더 조회 → 코드별 사양 이미지 인덱스(파일명=코드명 매칭) + 업로드/삭제. 상세 사양행 [보기] 버튼·코드사전 미리보기·편집 모달 업로드에 사용 |
 | [src/lib/accessList.js](src/lib/accessList.js) | SharePoint `Access` 폴더 접근권한 엑셀(G=이메일, H=권한) 읽기 |
 | [src/lib/codeIndex.js](src/lib/codeIndex.js) | `code_dict` → 코드 인덱스, 사양값 번역 매칭 |
 | [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 데이터 4개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
@@ -281,8 +281,10 @@ VITE_APP_TITLE=...
   - **파일명 = 코드명** 규칙으로 자동 매칭 (`A0A.jpg`, `w68k96 80.png` … 대소문자·확장자 무관).
   - 사양 상세 각 행에서, 해당 코드의 이미지가 폴더에 있으면 값 오른쪽에 [🖼 보기] 버튼이
     뜨고 클릭 시 확대 표시된다 (sales 포함 전체 열람, **출력·Excel·PDF 에는 미포함**).
-  - 코드사전(`/admin/dict`)에 코드별 이미지 유무 표시·미리보기가 있다(파일은 폴더에 직접 넣음,
-    앱 내 업로드 없음). 새 파일 반영은 상단 [이미지 다시 불러오기]. ([src/lib/specImages.js])
+  - 코드사전(`/admin/dict`)에 코드별 이미지 유무 표시·미리보기가 있고, **코드 편집 모달에서
+    이미지 파일을 직접 선택해 업로드/교체/삭제**할 수 있다(파일명을 `코드명.확장자` 로 폴더에
+    저장). 폴더에 직접 넣어도 되며, 그 경우 상단 [이미지 다시 불러오기]로 반영.
+    ([src/lib/specImages.js] — `uploadSpecImage`/`deleteSpecImageByName`)
 - 앱 사용자는 이 파일 "읽기" 권한, 관리자는 "편집" 권한 필요.
 
 ---

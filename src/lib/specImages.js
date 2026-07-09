@@ -16,7 +16,7 @@
  * 노출한다.
  */
 
-import { graphGet } from './graph';
+import { graphGet, graphPutFile, graphDelete } from './graph';
 import { normCode } from './codeIndex';
 
 // ─── SharePoint 위치 (env 로 덮어쓰기 가능) ──────────────────────────
@@ -96,4 +96,38 @@ export async function listSpecImages() {
 /** 관리자 안내용 — 사양 이미지 폴더의 SharePoint 경로 */
 export function specImageFolderPath() {
   return SPEC_PICTURES_PATH;
+}
+
+const ALLOWED_EXT = /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i;
+
+/**
+ * 코드에 이미지 파일을 업로드한다 (파일명 = 코드명 + 원본 확장자).
+ * spec_picture 폴더 안의 `{code}.{ext}` 경로에 PUT 한다.
+ * @param code  대상 코드 (예: 'D50', 'W68K96 80')
+ * @param file  File/Blob (image/*)
+ * @returns 생성된 driveItem
+ */
+export async function uploadSpecImage(code, file) {
+  const clean = String(code || '').trim();
+  if (!clean) throw new Error('코드를 먼저 입력해 주세요.');
+  const m = String(file?.name || '').match(ALLOWED_EXT);
+  const ext = m ? m[0].toLowerCase() : '.jpg';
+  const siteId = await resolveSiteId();
+  const path = `${SPEC_PICTURES_PATH}/${clean}${ext}`;
+  return graphPutFile(
+    `/sites/${siteId}/drive/root:/${encodeURI(path)}:/content`,
+    file
+  );
+}
+
+/**
+ * 파일명으로 사양 이미지를 삭제한다 (spec_picture 폴더 기준).
+ * 코드 교체 시 기존 확장자 파일을 정리하는 용도.
+ */
+export async function deleteSpecImageByName(name) {
+  const clean = String(name || '').trim();
+  if (!clean) return;
+  const siteId = await resolveSiteId();
+  const path = `${SPEC_PICTURES_PATH}/${clean}`;
+  await graphDelete(`/sites/${siteId}/drive/root:/${encodeURI(path)}:`);
 }

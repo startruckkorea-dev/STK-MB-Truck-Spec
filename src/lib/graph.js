@@ -58,3 +58,40 @@ export const graphGet = (path, opts) => graphFetch(path, { ...opts, method: 'GET
 export const graphPost = (path, body, opts) => graphFetch(path, { ...opts, method: 'POST', body });
 export const graphPatch = (path, body, opts) => graphFetch(path, { ...opts, method: 'PATCH', body });
 export const graphDelete = (path, opts) => graphFetch(path, { ...opts, method: 'DELETE' });
+
+/**
+ * 바이너리 파일 업로드 (PUT …/content). 이미지 등 소용량 파일용(≤ 4MB 권장).
+ * file: Blob/File. 성공 시 생성된 driveItem(JSON) 반환.
+ */
+export async function graphPutFile(path, file, { _retry = 0 } = {}) {
+  const token = await getGraphToken(FILE_SCOPES);
+  const url = path.startsWith('http') ? path : GRAPH_BASE + path;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+    body: file,
+  });
+
+  if ((res.status === 429 || res.status === 503) && _retry < 3) {
+    const headerWait = Number(res.headers.get('Retry-After'));
+    const waitSec = Math.min(headerWait > 0 ? headerWait : 2 ** _retry * 2, 20);
+    await new Promise((r) => setTimeout(r, waitSec * 1000));
+    return graphPutFile(path, file, { _retry: _retry + 1 });
+  }
+
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const j = await res.json();
+      detail = j?.error?.message || JSON.stringify(j);
+    } catch {
+      detail = await res.text().catch(() => '');
+    }
+    throw new Error(`Graph PUT ${res.status}: ${detail}`);
+  }
+  return res.json();
+}
