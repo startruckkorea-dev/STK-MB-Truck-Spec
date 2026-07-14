@@ -8,6 +8,7 @@ import { parseDocx, parseQuotationFilename } from '../../lib/parser';
 import { downloadSourceFile } from '../../lib/sourceFiles';
 import { listHomologationFolder, HOMOLOGATION_ROOT_LABEL } from '../../lib/homologation';
 import { normCode, isKrCode, nextKrCode } from '../../lib/codeIndex';
+import { SPEC_CATEGORY_OPTIONS } from '../../lib/specCategories';
 import { useData } from '../../contexts/DataContext';
 
 // SharePoint webUrl 에서 표시용 파일명 추출 (마지막 경로 세그먼트, 쿼리 제거)
@@ -22,13 +23,6 @@ function fileNameFromUrl(url) {
 }
 
 const SERIES_OPTIONS = ['Actros', 'Arocs', 'Atego'];
-
-// 사양 카테고리 기본 후보 (parser.js 의 섹션/서브섹션 국문명과 동일하게 유지)
-const SPEC_CATEGORY_OPTIONS = [
-  '국가 사양', '섀시', '축중 배분', '엔진', '클러치 & 변속기', '차축 & 서스펜션',
-  '휠 & 타이어', '프레임', '브레이크', '캡 외장', '캡 내장', '전기 / 전자',
-  '페인트', '타이어', '차량 장비', '기본 사양', '선택 사양', '추가 사양', '추가 사항',
-];
 
 export default function AdminModelEdit() {
   const { id } = useParams(); // undefined = 신규 등록

@@ -8,12 +8,11 @@ import { useDict } from '../../hooks/useDict';
 import { useAuth } from '../../hooks/useAuth';
 import { useData } from '../../contexts/DataContext';
 import { isShortCode, normCode, nextKrCode } from '../../lib/codeIndex';
+import { SPEC_CATEGORY_OPTIONS } from '../../lib/specCategories';
 import { specImageFolderPath, uploadSpecImage, deleteSpecImageByName } from '../../lib/specImages';
 
-const CATEGORY_OPTIONS = [
-  '엔진', '변속기', '차축', '서스펜션', '타이어/휠', '캡', '외장 컬러',
-  '내장', '안전장비', '편의장비', '기타',
-];
+// 사양표(파서)와 같은 카테고리를 써야 사전에서 고른 값이 사양 화면과 어긋나지 않는다.
+const CATEGORY_OPTIONS = SPEC_CATEGORY_OPTIONS;
 
 const EMPTY_FORM = {
   code: '', name_en: '', name_ko: '', category: '', hex_color: '', is_hidden: false,
@@ -616,7 +615,7 @@ export default function AdminDict() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mb-blue"
               >
                 <option value="">선택안함</option>
-                {CATEGORY_OPTIONS.map((c) => <option key={c}>{c}</option>)}
+                {allCategories.map((c) => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div>
