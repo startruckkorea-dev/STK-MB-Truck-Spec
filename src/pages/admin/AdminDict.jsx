@@ -7,7 +7,7 @@ import ImageLightbox from '../../components/ImageLightbox';
 import { useDict } from '../../hooks/useDict';
 import { useAuth } from '../../hooks/useAuth';
 import { useData } from '../../contexts/DataContext';
-import { isShortCode, normCode } from '../../lib/codeIndex';
+import { isShortCode, normCode, nextKrCode } from '../../lib/codeIndex';
 import { specImageFolderPath, uploadSpecImage, deleteSpecImageByName } from '../../lib/specImages';
 
 const CATEGORY_OPTIONS = [
@@ -45,7 +45,7 @@ export default function AdminDict() {
   // 본사직원A(canEditDict=false)는 읽기 전용 — 편집/삭제/엑셀열기/다시불러오기 불가
   const { canEditDict } = useAuth();
   // 사양 이미지 인덱스 (spec_picture 폴더: 파일명=코드명 매칭)
-  const { specImageIndex, reloadSpecImages } = useData();
+  const { specImageIndex, reloadSpecImages, codeDict } = useData();
 
   const [modal, setModal] = useState(null); // null | 'new' | item
   const [form, setForm] = useState(EMPTY_FORM);
@@ -98,7 +98,9 @@ export default function AdminDict() {
   }
 
   function openNew(prefillCode = '') {
-    setForm({ ...EMPTY_FORM, code: prefillCode });
+    // 이벤트 핸들러로 직접 넘어온 경우 등 문자열이 아닌 값 방어
+    const code = typeof prefillCode === 'string' ? prefillCode : '';
+    setForm({ ...EMPTY_FORM, code });
     setFormError('');
     setImgError('');
     setModal('new');
@@ -232,7 +234,7 @@ export default function AdminDict() {
               <option value="hidden">숨김</option>
             </select>
             {canEditDict && (
-              <Button onClick={openNew} className="flex-shrink-0 text-xs sm:text-sm">+ 등록</Button>
+              <Button onClick={() => openNew()} className="flex-shrink-0 text-xs sm:text-sm">+ 등록</Button>
             )}
           </div>
         )}
@@ -559,13 +561,34 @@ export default function AdminDict() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">영문 코드 *</label>
-              <input
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                disabled={modal === 'edit'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-mb-blue disabled:bg-gray-50"
-                placeholder="예: OM471"
-              />
+              <div className="flex gap-2">
+                <input
+                  value={form.code}
+                  onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                  disabled={modal === 'edit'}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-mb-blue disabled:bg-gray-50"
+                  placeholder="예: OM471"
+                />
+                {modal === 'new' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const kr = nextKrCode(codeDict);
+                      if (!kr) return setFormError('KR01~KR99 를 모두 사용했습니다.');
+                      setForm((f) => ({ ...f, code: kr }));
+                    }}
+                    className="flex-shrink-0 whitespace-nowrap"
+                    title="견적서에 없는 사내 전용 코드 (KR01~KR99) 자동 발급"
+                  >
+                    KR 코드
+                  </Button>
+                )}
+              </div>
+              {modal === 'new' && (
+                <p className="text-xs text-gray-400 mt-1">
+                  견적서(.docx)에 없는 사양은 [KR 코드]로 사내 코드(KR01~KR99)를 발급해 등록하세요.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">영문 설명 (선택)</label>

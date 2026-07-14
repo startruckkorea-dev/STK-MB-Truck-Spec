@@ -28,6 +28,28 @@ export function normCode(v) {
   return String(v || '').trim().toUpperCase();
 }
 
+// ─── KR 커스텀 코드 (KR01~KR99) ─────────────────────────────────
+// 견적서(.docx)에 없는 사양을 관리자가 모델에 직접 추가할 때 쓰는 사내 코드.
+// code_dict 에만 등록되며 SharePoint 의 견적서 원본 파일은 변경하지 않는다.
+export const KR_CODE_RE = /^KR\d{2}$/;
+export const KR_CODE_MAX = 99;
+
+export function isKrCode(v) {
+  return KR_CODE_RE.test(normCode(v));
+}
+
+/** code_dict 에서 아직 쓰지 않은 가장 작은 KR 코드. 전부 소진되면 null */
+export function nextKrCode(codeDict) {
+  const used = new Set(
+    codeDict.map(rowMbCode).filter(isKrCode)
+  );
+  for (let n = 1; n <= KR_CODE_MAX; n++) {
+    const code = `KR${String(n).padStart(2, '0')}`;
+    if (!used.has(code)) return code;
+  }
+  return null;
+}
+
 /**
  * 전체 code_dict → { 정규화된_MB코드: row } 인덱스.
  * code 열(모델 사양용)이 category 열보다 우선한다.
