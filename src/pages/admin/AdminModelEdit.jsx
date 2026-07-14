@@ -23,6 +23,13 @@ function fileNameFromUrl(url) {
 
 const SERIES_OPTIONS = ['Actros', 'Arocs', 'Atego'];
 
+// 사양 카테고리 기본 후보 (parser.js 의 섹션/서브섹션 국문명과 동일하게 유지)
+const SPEC_CATEGORY_OPTIONS = [
+  '국가 사양', '섀시', '축중 배분', '엔진', '클러치 & 변속기', '차축 & 서스펜션',
+  '휠 & 타이어', '프레임', '브레이크', '캡 외장', '캡 내장', '전기 / 전자',
+  '페인트', '타이어', '차량 장비', '기본 사양', '선택 사양', '추가 사양', '추가 사항',
+];
+
 export default function AdminModelEdit() {
   const { id } = useParams(); // undefined = 신규 등록
   const navigate = useNavigate();
@@ -195,9 +202,10 @@ export default function AdminModelEdit() {
   // ── 사양 행 직접 편집 (견적서에 없는 코드 추가 등) ──
   // 여기서의 변경은 SharePoint 의 견적서(.docx) 원본 파일에는 반영되지 않는다.
   // 신규 KR 코드는 code_dict 시트에만 등록된다.
+  // 카테고리 후보: 이 모델의 사양 + 파서 기본 카테고리 (중복 제거, 표시 순서 유지)
   const specCategories = [...new Set([
     ...(parsedSpecs || []).map((s) => s.category).filter(Boolean),
-    ...codeDict.map((c) => c.category).filter((c) => c && !/^[A-Za-z0-9]{1,8}$/.test(String(c).trim())),
+    ...SPEC_CATEGORY_OPTIONS,
   ])];
 
   function openSpecEditor(index = null) {
@@ -222,7 +230,7 @@ export default function AdminModelEdit() {
     setSpecEditor({
       index: null,
       mode: 'kr',
-      category: specCategories[0] || '추가 사양',
+      category: '',
       code: nextKrCode(codeDict) || '',
       label_ko: '',
       name_ko: '',
@@ -887,6 +895,8 @@ export default function AdminModelEdit() {
 function SpecEditorModal({ value: v, onChange, onSubmit, onClose, categories, codeIndex, nextKr }) {
   const isNew = v.index == null;
   const entry = codeIndex[normCode(v.code)];
+  // 목록에 없는 카테고리(기존 행 편집 등)는 직접 입력 모드로 시작
+  const [custom, setCustom] = useState(Boolean(v.category) && !categories.includes(v.category));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -937,16 +947,33 @@ function SpecEditorModal({ value: v, onChange, onSubmit, onClose, categories, co
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">카테고리 *</label>
-            <input
-              list="spec-categories"
-              value={v.category}
-              onChange={(e) => onChange({ category: e.target.value })}
-              placeholder="예: 엔진, 캡 외장, 추가 사항"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
-            />
-            <datalist id="spec-categories">
-              {categories.map((c) => <option key={c} value={c} />)}
-            </datalist>
+            {/* 목록에 없는 카테고리는 '직접 입력'으로 새로 만들 수 있다 */}
+            <select
+              value={custom ? '__custom__' : v.category}
+              onChange={(e) => {
+                if (e.target.value === '__custom__') {
+                  setCustom(true);
+                  onChange({ category: '' });
+                } else {
+                  setCustom(false);
+                  onChange({ category: e.target.value });
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mb-blue"
+            >
+              <option value="">선택하세요</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              <option value="__custom__">+ 직접 입력</option>
+            </select>
+            {custom && (
+              <input
+                autoFocus
+                value={v.category}
+                onChange={(e) => onChange({ category: e.target.value })}
+                placeholder="새 카테고리명 입력"
+                className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
+              />
+            )}
           </div>
 
           <div>
