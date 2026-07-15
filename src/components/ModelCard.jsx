@@ -35,6 +35,7 @@ export default function ModelCard({
   onDragOver,
   onDrop,
   onDragEnd,
+  onNavigate,
 }) {
   const { isAdmin } = useAuth();
   const { setModelVisible } = useData();
@@ -102,7 +103,7 @@ export default function ModelCard({
 
         {/* 액션 버튼 */}
         <div className="flex gap-2">
-          <Link to={`/models/${model.id}`} className="flex-1 min-w-0">
+          <Link to={`/models/${model.id}`} onClick={() => onNavigate?.()} className="flex-1 min-w-0">
             <Button variant="outline" size="sm" className="w-full text-xs sm:text-sm">
               사양 상세
             </Button>

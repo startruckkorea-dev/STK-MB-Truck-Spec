@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import ModelCard from '../components/ModelCard';
@@ -25,6 +25,18 @@ const BADGE_LABELS = {
 const FLEET_BADGES = new Set(['fleet-domestic', 'fleet-export', 'branch-order']);
 
 const VIEW_KEY = 'models-view-mode';
+
+// 목록으로 돌아왔을 때 보던 위치(필터·스크롤)를 복원하기 위한 세션 저장 키
+const STATE_KEY = 'models-list-state';
+
+function loadSavedState() {
+  try {
+    const raw = sessionStorage.getItem(STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 // 차종 정렬 우선순위
 const BODY_TYPE_ORDER = ['트랙터', '카고', '덤프', '믹서', '크레인'];
@@ -56,9 +68,11 @@ export default function Models() {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const [activeSeries, setActiveSeries] = useState('전체');
-  const [selectedYear, setSelectedYear] = useState('');
-  const [search, setSearch] = useState('');
+  // 목록으로 되돌아온 경우 이전에 보던 필터 상태를 복원한다
+  const savedState = useRef(loadSavedState()).current;
+  const [activeSeries, setActiveSeries] = useState(savedState?.activeSeries ?? '전체');
+  const [selectedYear, setSelectedYear] = useState(savedState?.selectedYear ?? '');
+  const [search, setSearch] = useState(savedState?.search ?? '');
   const [compareList, setCompareList] = useState([]);
   const [reordering, setReordering] = useState(false);
   // 드래그 재정렬 상태
@@ -79,6 +93,39 @@ export default function Models() {
     setViewMode(mode);
     localStorage.setItem(VIEW_KEY, mode);
   }
+
+  // 현재 필터/스크롤 위치를 세션에 저장 (상세로 이동하기 직전 호출)
+  function saveListState() {
+    try {
+      sessionStorage.setItem(
+        STATE_KEY,
+        JSON.stringify({
+          activeSeries,
+          selectedYear,
+          search,
+          scrollY: window.scrollY,
+        })
+      );
+    } catch { /* 무시 */ }
+  }
+
+  // 상세로 이동하면서 현재 위치를 저장한다
+  function goToModel(id) {
+    saveListState();
+    navigate(`/models/${id}`);
+  }
+
+  // 목록으로 돌아왔을 때: 데이터가 준비되면 저장해 둔 스크롤 위치로 복원
+  const scrollRestored = useRef(false);
+  useLayoutEffect(() => {
+    if (scrollRestored.current) return;
+    if (loading) return;
+    const y = savedState?.scrollY;
+    if (typeof y === 'number' && y > 0) {
+      window.scrollTo(0, y);
+    }
+    scrollRestored.current = true;
+  }, [loading, savedState]);
 
   // model_id → 노트 배열 (기타특징 표시용)
   const notesByModel = useMemo(() => {
@@ -251,7 +298,7 @@ export default function Models() {
                 return (
                   <tr
                     key={model.id}
-                    onClick={() => navigate(`/models/${model.id}`)}
+                    onClick={() => goToModel(model.id)}
                     draggable={isAdmin}
                     onDragStart={(e) => handleDragStart(e, model.id)}
                     onDragOver={(e) => handleDragOver(e, model.id)}
@@ -499,6 +546,7 @@ export default function Models() {
                           onDragOver={(e) => handleDragOver(e, model.id)}
                           onDrop={(e) => { e.preventDefault(); handleDrop(model.id, bodyModels.map((m) => m.id)); }}
                           onDragEnd={handleDragEnd}
+                          onNavigate={saveListState}
                         />
                       ))}
                     </div>
