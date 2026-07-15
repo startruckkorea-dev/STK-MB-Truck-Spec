@@ -1,9 +1,9 @@
-# 메르세데스-벤츠 트럭 사양 소개 — 시스템 설계서
+# 메르세데스-벤츠 트럭 모델 정보 — 시스템 설계서
 
 > **문서 버전:** v2.0  
 > **최종 수정:** 2026-02-26  
 > **작성:** 상품기획팀  
-> **사이트 제목:** 메르세데스-벤츠 트럭 사양 소개
+> **사이트 제목:** 메르세데스-벤츠 트럭 모델 정보
 
 ---
 
@@ -191,7 +191,7 @@
 | 항목 | 내용 |
 |---|---|
 | 상단 로고 | MB_Star_Logo_black.png 표시 |
-| 사이트 제목 | "메르세데스-벤츠 트럭 사양 소개" |
+| 사이트 제목 | "메르세데스-벤츠 트럭 모델 정보" |
 | 인증 방식 | Supabase Auth (이메일 + 비밀번호) |
 | 역할 판별 | 로그인 후 `profiles` 테이블에서 role 조회 |
 | 리다이렉트 | `admin` → `/admin/models`, `sales` → `/models` |
@@ -572,7 +572,7 @@ CREATE POLICY "profiles_admin" ON profiles FOR SELECT
 
 - **로고:** `MB_Star_Logo_black.png` (첨부 파일)
 - **배치:** 로그인 상단 중앙, 네비게이션 바 좌측
-- **사이트 제목:** "메르세데스-벤츠 트럭 사양 소개"
+- **사이트 제목:** "메르세데스-벤츠 트럭 모델 정보"
 
 ### 10.3 타이포그래피
 
@@ -660,7 +660,7 @@ mb-truck-spec/
 ```
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_APP_TITLE=메르세데스-벤츠 트럭 사양 소개
+VITE_APP_TITLE=메르세데스-벤츠 트럭 모델 정보
 ```
 
 ### Vercel 배포

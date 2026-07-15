@@ -48,7 +48,7 @@ export default function Login() {
           <h1 className="font-barlow font-bold text-2xl text-gray-900 tracking-wide">
             메르세데스-벤츠 트럭
           </h1>
-          <p className="text-gray-500 text-sm mt-1">사양 소개</p>
+          <p className="text-gray-500 text-sm mt-1">모델 정보</p>
         </div>
 
         {/* 로그인 카드 */}
