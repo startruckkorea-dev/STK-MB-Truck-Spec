@@ -80,7 +80,7 @@ function ensureNoticeFolder(siteId) {
 /** SharePoint 파일명에 쓸 수 없는 문자를 정리한다 */
 function safeName(name) {
   return String(name || 'file')
-    .replace(/[\/:*?"<>|#%]/g, '_')
+    .replace(/[\\/:*?"<>|#%]/g, '_')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 120) || 'file';

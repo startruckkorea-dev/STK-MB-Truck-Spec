@@ -142,7 +142,7 @@ export async function ensureSheet(name) {
     await graphGet(`${base}/worksheets('${name}')?$select=name`);
     return false; // 이미 있음
   } catch (err) {
-    if (!/404/.test(err.message)) throw err;
+    if (!/\b404\b/.test(err.message)) throw err;
   }
   await graphPost(`${base}/worksheets/add`, { name });
   const cols = SHEETS[name].columns;
@@ -153,13 +153,17 @@ export async function ensureSheet(name) {
   return true; // 새로 만듦
 }
 
-/** readSheet 와 같지만 시트가 아직 없으면 빈 배열을 반환한다 (선택 기능용) */
+/**
+ * readSheet 와 같지만 실패하면 빈 배열을 반환한다 (선택 기능용).
+ * 아직 만들어지지 않은 시트(`notices` 등)나 그 조회 실패 때문에 앱 전체 데이터
+ * 로드가 깨지면 안 되므로, 404 뿐 아니라 어떤 오류든 삼키고 빈 목록으로 둔다.
+ */
 export async function readSheetIfExists(name) {
   try {
     return await readSheet(name);
   } catch (err) {
-    if (/404/.test(err.message)) return [];
-    throw err;
+    console.warn(`[workbook] '${name}' 시트를 읽지 못했습니다 (무시):`, err.message);
+    return [];
   }
 }
 
