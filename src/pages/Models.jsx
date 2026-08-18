@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import ModelCard from '../components/ModelCard';
 import CompareBar from '../components/CompareBar';
+import NoticeBoard from '../components/NoticeBoard';
 import Badge from '../components/ui/Badge';
 import { useModels } from '../hooks/useModels';
 import { useData } from '../contexts/DataContext';
@@ -414,6 +415,9 @@ export default function Models() {
 
   return (
     <Layout>
+      {/* 공지사항 게시판 */}
+      <NoticeBoard />
+
       {/* 헤더 */}
       <div className="mb-4 sm:mb-6 flex items-start justify-between gap-3">
         <div>

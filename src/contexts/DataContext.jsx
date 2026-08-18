@@ -16,7 +16,7 @@ import { compareModels } from '../lib/modelSort';
 
 const DataContext = createContext(null);
 
-const EMPTY = { codeDict: [], models: [], specs: [], modelNotes: [] };
+const EMPTY = { codeDict: [], models: [], specs: [], modelNotes: [], notices: [] };
 
 /** 배열에서 다음 정수 id (max + 1) */
 const nextId = (arr) => arr.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) + 1;
@@ -42,13 +42,15 @@ export function DataProvider({ children }) {
     setLoading(true);
     setError(null);
     try {
-      const [codeDict, models, specs, modelNotes] = await Promise.all([
+      const [codeDict, models, specs, modelNotes, notices] = await Promise.all([
         wb.readSheet('code_dict'),
         wb.readSheet('models'),
         wb.readSheet('specs'),
         wb.readSheet('model_notes'),
+        // 공지 시트는 나중에 추가된 것이라 아직 없을 수 있다 → 없으면 빈 목록
+        wb.readSheetIfExists('notices'),
       ]);
-      setState({ codeDict, models, specs, modelNotes });
+      setState({ codeDict, models, specs, modelNotes, notices });
       setLoaded(true);
     } catch (e) {
       const msg = /404|찾지 못/.test(e.message)
@@ -224,6 +226,56 @@ export function DataProvider({ children }) {
     setState((st) => ({ ...st, models: renumbered }));
   }
 
+  // ─── notices (공지사항) ────────────────────────────────────────────
+  /**
+   * 공지 저장 (신규/수정). 첨부 메타는 JSON 문자열로 한 셀에 담는다.
+   * 시트가 아직 없으면 자동으로 만든다.
+   * @returns 저장된 공지 id
+   */
+  async function saveNotice(notice) {
+    await wb.ensureSheet('notices');
+    const cur = stateRef.current.notices;
+    const isNew = notice.id == null;
+    const now = new Date().toISOString();
+    const row = {
+      ...notice,
+      id: isNew ? nextId(cur) : Number(notice.id),
+      created_at: isNew ? now : notice.created_at || now,
+      updated_at: now,
+    };
+    const next = isNew
+      ? [row, ...cur]                                        // 최신 글이 위로
+      : cur.map((n) => (sameId(n.id, row.id) ? row : n));
+    await wb.overwriteSheet('notices', next);
+    setState((s) => ({ ...s, notices: next }));
+    return row.id;
+  }
+
+  async function deleteNotice(id) {
+    const next = stateRef.current.notices.filter((n) => !sameId(n.id, id));
+    await wb.ensureSheet('notices');
+    await wb.overwriteSheet('notices', next);
+    setState((s) => ({ ...s, notices: next }));
+  }
+
+  async function setNoticeVisible(id, visible) {
+    const next = stateRef.current.notices.map((n) =>
+      sameId(n.id, id) ? { ...n, is_visible: visible } : n
+    );
+    await wb.ensureSheet('notices');
+    await wb.overwriteSheet('notices', next);
+    setState((s) => ({ ...s, notices: next }));
+  }
+
+  async function setNoticePinned(id, pinned) {
+    const next = stateRef.current.notices.map((n) =>
+      sameId(n.id, id) ? { ...n, is_pinned: pinned } : n
+    );
+    await wb.ensureSheet('notices');
+    await wb.overwriteSheet('notices', next);
+    setState((s) => ({ ...s, notices: next }));
+  }
+
   async function setSpecHidden(specId, hidden) {
     const s = stateRef.current;
     const idx = s.specs.findIndex((x) => sameId(x.id, specId));
@@ -256,6 +308,10 @@ export function DataProvider({ children }) {
     moveModelOrder,
     reorderModels,
     setSpecHidden,
+    saveNotice,
+    deleteNotice,
+    setNoticeVisible,
+    setNoticePinned,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

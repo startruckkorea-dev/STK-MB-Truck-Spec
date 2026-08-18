@@ -42,6 +42,12 @@ export const SHEETS = {
     columns: ['email', 'name', 'role', 'is_active'],
     types: { is_active: 'bool' },
   },
+  // 공지사항 — 모델 목록 상단 게시판. 첨부파일은 SharePoint `Notice` 폴더에 올리고
+  // attachments 컬럼에 JSON 문자열([{id,name,size,webUrl}])로 보관한다.
+  notices: {
+    columns: ['id', 'title', 'content', 'is_pinned', 'is_visible', 'author', 'created_at', 'updated_at', 'attachments', 'sort_order'],
+    types: { id: 'num', is_pinned: 'bool', is_visible: 'bool', sort_order: 'num' },
+  },
 };
 
 // ─── 파일(워크북) 위치 해석 — 1회 캐시 ───────────────────────────────
@@ -124,6 +130,37 @@ export async function readSheet(name) {
   const values = r?.values || [];
   if (values.length < 2) return []; // 헤더만 또는 빈 시트
   return values.slice(1).map((v) => valuesToRow(name, v));
+}
+
+/**
+ * 시트가 없으면 만들고 1행에 헤더를 써 넣는다 (이미 있으면 아무 것도 안 함).
+ * 워크북에 나중에 추가된 시트(notices 등)를 관리자가 수동으로 만들지 않아도 되게 한다.
+ */
+export async function ensureSheet(name) {
+  const base = await wbBase();
+  try {
+    await graphGet(`${base}/worksheets('${name}')?$select=name`);
+    return false; // 이미 있음
+  } catch (err) {
+    if (!/404/.test(err.message)) throw err;
+  }
+  await graphPost(`${base}/worksheets/add`, { name });
+  const cols = SHEETS[name].columns;
+  await graphPatch(
+    `${base}/worksheets('${name}')/range(address='A1:${colLetter(cols.length)}1')`,
+    { values: [cols] }
+  );
+  return true; // 새로 만듦
+}
+
+/** readSheet 와 같지만 시트가 아직 없으면 빈 배열을 반환한다 (선택 기능용) */
+export async function readSheetIfExists(name) {
+  try {
+    return await readSheet(name);
+  } catch (err) {
+    if (/404/.test(err.message)) return [];
+    throw err;
+  }
 }
 
 /** 특정 데이터 행(0-base index) 1줄만 읽음 — 동시편집 검증용 */

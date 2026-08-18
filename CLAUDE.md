@@ -71,6 +71,18 @@
 - 비교 선택 시 하단 고정 바(compare bar) 표시, 최대 3개
 - `sales`/`staff-b` 에게는 `is_visible=false` 모델 숨김 (admin·`staff-a` 는 전체)
 
+### 2-1. 공지사항 게시판 (모델 목록 상단)
+- 첫 화면(`/models`) 최상단에 공지 목록이 표시된다 (고정글 우선 → 최신순, 기본 3건 + 더보기)
+- 제목을 클릭하면 모달로 본문과 첨부파일을 본다. 이미지는 바로 표시(클릭 시 확대),
+  PDF·문서는 [열기]/[다운로드] 링크
+- **관리자만** 작성/수정/삭제, [고정](상단 고정)·[숨김](비공개) 전환 가능.
+  비공개 글은 관리자에게만 `비공개` 배지와 함께 보인다
+- 본문은 워크북 `notices` 시트, 첨부파일은 SharePoint `mbtruck-spec/Notice/` 폴더에 저장
+  (첨부 1건당 최대 4MB). 시트가 아직 없으면 첫 저장 때 앱이 자동 생성한다
+- [src/components/NoticeBoard.jsx](src/components/NoticeBoard.jsx),
+  [src/components/admin/NoticeEditor.jsx](src/components/admin/NoticeEditor.jsx),
+  [src/lib/notices.js](src/lib/notices.js)
+
 ### 3. 사양 상세 페이지 (`/models/:id`)
 - 카테고리별 사양 테이블
 - 각 행: 항목명(국문) / 영문 코드 / 번역된 값
@@ -115,7 +127,7 @@
 `.xlsx` 파일 1개. 앱([src/lib/workbook.js](src/lib/workbook.js))이 그 폴더의 `.xlsx` 를
 **자동 탐색**한다 (파일명 무관, 폴더에 `.xlsx` 는 하나만 둘 것).
 
-워크북은 시트 4개. 각 시트 **1행 = 헤더, 2행부터 데이터**. 컬럼 **순서**가 중요하다
+워크북은 시트 5개(`notices` 는 공지 첫 저장 시 자동 생성). 각 시트 **1행 = 헤더, 2행부터 데이터**. 컬럼 **순서**가 중요하다
 (앱이 위치 기준으로 읽음). 불리언은 `TRUE`/`FALSE`.
 
 | 시트 | 컬럼 (순서대로) |
@@ -124,6 +136,7 @@
 | `models` | id, series, code, axle, cabin, code_desc, name_ko, model_year, production_month, badge, is_visible, sort_order |
 | `specs` | id, model_id, category, spec_key, spec_value, label_ko, use_translate, is_color, is_hidden, sort_order |
 | `model_notes` | id, model_id, label, content, sort_order |
+| `notices` | id, title, content, is_pinned, is_visible, author, created_at, updated_at, attachments, sort_order |
 
 > 역할 권한은 이 데이터 워크북이 아니라 별도의 `Access/Access_List_*.xlsx`(G=이메일, H=권한)로
 > 관리한다. ([src/lib/accessList.js](src/lib/accessList.js)) (과거 `users` 시트는 더 이상 역할에 쓰이지 않음)
@@ -150,6 +163,7 @@
 | [src/lib/sourceFiles.js](src/lib/sourceFiles.js) | SharePoint 견적서(.docx) 원본 폴더 탐색·다운로드 |
 | [src/lib/pictures.js](src/lib/pictures.js) | SharePoint 모델 사진 폴더 자동 매칭·조회(상세 화면 갤러리) |
 | [src/lib/specImages.js](src/lib/specImages.js) | SharePoint `spec_picture` 폴더 조회 → 코드별 사양 이미지 인덱스(파일명=코드명 매칭) + 업로드/삭제. 상세 사양행 [보기] 버튼·코드사전 미리보기·편집 모달 업로드에 사용 |
+| [src/lib/notices.js](src/lib/notices.js) | 공지 첨부파일 SharePoint `Notice` 폴더 업로드·삭제·다운로드 URL 재발급 |
 | [src/lib/accessList.js](src/lib/accessList.js) | SharePoint `Access` 폴더 접근권한 엑셀(G=이메일, H=권한) 읽기 |
 | [src/lib/codeIndex.js](src/lib/codeIndex.js) | `code_dict` → 코드 인덱스, 사양값 번역 매칭 |
 | [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 데이터 4개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
@@ -196,6 +210,7 @@ mb-truck-spec/
 │   │   ├── workbook.js        ← SharePoint Excel 워크북 액세스
 │   │   ├── sourceFiles.js     ← SharePoint 견적서(.docx) 폴더 탐색
 │   │   ├── accessList.js      ← SharePoint Access 폴더 접근권한 엑셀 읽기
+│   │   ├── notices.js         ← 공지 첨부파일(SharePoint Notice 폴더)
 │   │   ├── codeIndex.js       ← 코드 사전 매칭 유틸
 │   │   ├── parser.js          ← .docx 파싱 (mammoth) + 파일명 기본정보 추출
 │   │   └── export.js          ← 사양 Excel/PDF 내보내기
@@ -205,6 +220,8 @@ mb-truck-spec/
 │   │   ├── ui/                ← Button, Badge, Toggle, LangToggle
 │   │   ├── admin/ExcelImport.jsx     ← SharePoint Excel 열기 + 다시 불러오기 패널
 │   │   ├── admin/SharePointPicker.jsx ← 견적서 .docx 공유폴더 탐색 모달
+│   │   ├── NoticeBoard.jsx           ← 모델 목록 상단 공지사항 게시판
+│   │   ├── admin/NoticeEditor.jsx    ← 공지 작성/수정 모달(첨부 업로드)
 │   │   ├── Layout.jsx, ModelCard.jsx, SpecTable.jsx,
 │   │   ├── CompareTable.jsx, CompareBar.jsx, ColorSwatch.jsx
 │   ├── pages/
@@ -253,6 +270,7 @@ VITE_SP_QUOTATION_PATH=mbtruck-spec/Quotation  # 견적서(.docx) 원본 폴더
 VITE_SP_PICTURES_PATH=mbtruck-spec/Pictures    # 모델 사진 원본 폴더
 VITE_SP_SPEC_PICTURES_PATH=mbtruck-spec/spec_picture  # 사양 코드별 이미지 폴더(파일명=코드명)
 VITE_SP_ACCESS_PATH=mbtruck-spec/Access        # 접근권한 엑셀(Access_List_*.xlsx) 폴더
+VITE_SP_NOTICE_PATH=mbtruck-spec/Notice        # 공지사항 첨부파일 폴더(앱이 없으면 자동 생성)
 
 # 앱 타이틀
 VITE_APP_TITLE=...
@@ -293,6 +311,9 @@ VITE_APP_TITLE=...
     이미지 파일을 직접 선택해 업로드/교체/삭제**할 수 있다(파일명을 `코드명.확장자` 로 폴더에
     저장). 폴더에 직접 넣어도 되며, 그 경우 상단 [이미지 다시 불러오기]로 반영.
     ([src/lib/specImages.js] — `uploadSpecImage`/`deleteSpecImageByName`)
+- 공지 첨부파일 폴더: `Shared Documents/mbtruck-spec/Notice/` (평면 폴더, 없으면 앱이 자동 생성)
+  - 관리자가 공지에 첨부한 이미지·PDF·문서가 `{타임스탬프}-{원본파일명}` 으로 저장된다.
+  - 공지 수정에서 첨부를 지우면 이 폴더의 파일도 함께 삭제된다.
 - 앱 사용자는 이 파일 "읽기" 권한, 관리자는 "편집" 권한 필요.
 
 ---
