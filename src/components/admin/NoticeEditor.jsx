@@ -37,12 +37,32 @@ export default function NoticeEditor({ notice, onClose }) {
   const [dragOver, setDragOver] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  // 배경 클릭 닫기는 "배경에서 눌러 배경에서 뗀" 경우에만 인정한다.
+  // (입력창 안에서 드래그로 텍스트를 선택하다 바깥에서 손을 떼면 click 이 배경에서
+  //  발생해, 작성 중이던 글이 그대로 날아가며 창이 닫히던 문제)
+  const backdropDown = useRef(false);
+
+  // 작성/수정 중인 내용이 있는지 — 실수로 닫을 때 확인을 띄우는 기준
+  const dirty =
+    title !== (notice?.title || '') ||
+    content !== (notice?.content || '') ||
+    added.length > 0 ||
+    removed.length > 0 ||
+    isPinned !== !!notice?.is_pinned ||
+    isVisible !== (notice ? notice.is_visible !== false : true);
+
+  /** 저장 중이 아니고, 변경분이 있으면 한 번 확인한 뒤 닫는다 */
+  function requestClose() {
+    if (saving) return;
+    if (dirty && !window.confirm('작성 중인 내용이 저장되지 않습니다. 닫을까요?')) return;
+    onClose();
+  }
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' && !saving) onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') requestClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, saving]);
+  });
 
   function addFiles(list) {
     const files = Array.from(list || []);
@@ -100,10 +120,19 @@ export default function NoticeEditor({ notice, onClose }) {
   return (
     <div
       className="fixed inset-0 z-[80] bg-black/50 flex items-start sm:items-center justify-center p-3 sm:p-6 overflow-y-auto"
-      onClick={() => !saving && onClose()}
+      // 첨부 영역 밖에 파일을 떨어뜨리면 브라우저가 그 파일로 이동해 버려
+      // 작성 중이던 글이 통째로 날아간다 — 모달 위 드롭은 전부 무시한다.
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => e.preventDefault()}
+      onMouseDown={(e) => { backdropDown.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropDown.current) requestClose();
+        backdropDown.current = false;
+      }}
     >
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-4"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
@@ -111,7 +140,7 @@ export default function NoticeEditor({ notice, onClose }) {
             {notice ? '공지 수정' : '공지 작성'}
           </h2>
           <button
-            onClick={() => !saving && onClose()}
+            onClick={requestClose}
             className="text-gray-400 hover:text-gray-600 text-xl leading-none"
             aria-label="닫기"
           >
@@ -236,7 +265,7 @@ export default function NoticeEditor({ notice, onClose }) {
 
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200">
           <button
-            onClick={() => !saving && onClose()}
+            onClick={requestClose}
             disabled={saving}
             className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
           >

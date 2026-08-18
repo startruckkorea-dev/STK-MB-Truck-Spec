@@ -7,7 +7,7 @@
  *   ([src/lib/notices.js])
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../hooks/useAuth';
 import NoticeEditor from './admin/NoticeEditor';
@@ -244,6 +244,7 @@ function Pager({ page, totalPages, total, onChange }) {
 
 // ─── 공지 읽기 모달 ─────────────────────────────────────────────────
 function NoticeViewer({ notice, onClose }) {
+  const backdropDown = useRef(false);
   const [files, setFiles] = useState([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [lightbox, setLightbox] = useState(null);
@@ -274,10 +275,17 @@ function NoticeViewer({ notice, onClose }) {
   return (
     <div
       className="fixed inset-0 z-[75] bg-black/50 flex items-start sm:items-center justify-center p-3 sm:p-6 overflow-y-auto"
-      onClick={onClose}
+      onMouseDown={(e) => { backdropDown.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        // 본문에서 드래그로 텍스트를 선택하다 바깥에서 손을 떼도 닫히지 않게,
+        // "배경에서 눌러 배경에서 뗀" 클릭만 닫기로 인정한다.
+        if (e.target === e.currentTarget && backdropDown.current) onClose();
+        backdropDown.current = false;
+      }}
     >
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-3xl my-4"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 px-5 py-3 border-b border-gray-200">
