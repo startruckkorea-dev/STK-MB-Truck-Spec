@@ -7,7 +7,7 @@
 
 import { useEffect } from 'react';
 
-export default function ImageLightbox({ src, alt = '', caption = '', onClose }) {
+export default function ImageLightbox({ src, alt = '', onClose }) {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') onClose();
@@ -37,12 +37,6 @@ export default function ImageLightbox({ src, alt = '', caption = '', onClose }) 
         onClick={(e) => e.stopPropagation()}
         className="max-w-[94vw] max-h-[88vh] object-contain rounded shadow-2xl"
       />
-
-      {caption && (
-        <div className="absolute bottom-4 left-0 right-0 text-center text-white/70 text-xs px-4 truncate">
-          {caption}
-        </div>
-      )}
     </div>
   );
 }
