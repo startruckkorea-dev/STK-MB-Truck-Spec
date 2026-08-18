@@ -37,13 +37,14 @@ function isRecent(v) {
   return Date.now() - d.getTime() < 7 * 24 * 60 * 60 * 1000;
 }
 
-const COLLAPSED_COUNT = 3;
+/** 한 페이지에 보여 줄 공지 수 — 나머지는 페이지를 넘겨서 본다 */
+const PAGE_SIZE = 5;
 
 export default function NoticeBoard() {
   const { notices, deleteNotice, setNoticePinned, setNoticeVisible } = useData();
   const { isAdmin } = useAuth();
 
-  const [expanded, setExpanded] = useState(false); // 목록 더보기
+  const [page, setPage] = useState(1); // 1-base
   const [openNotice, setOpenNotice] = useState(null); // 읽기 모달
   const [editing, setEditing] = useState(null); // { notice } | { notice: null } = 신규
   const [busyId, setBusyId] = useState(null);
@@ -58,7 +59,14 @@ export default function NoticeBoard() {
     });
   }, [notices, isAdmin]);
 
-  const shown = expanded ? list : list.slice(0, COLLAPSED_COUNT);
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  // 글이 지워져 페이지 수가 줄면 마지막 페이지로 당긴다
+  const curPage = Math.min(page, totalPages);
+  const shown = list.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
+
+  useEffect(() => {
+    if (page !== curPage) setPage(curPage);
+  }, [page, curPage]);
 
   async function run(id, fn) {
     setBusyId(id);
@@ -173,13 +181,8 @@ export default function NoticeBoard() {
         </ul>
       )}
 
-      {list.length > COLLAPSED_COUNT && (
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="w-full py-2 text-xs font-medium text-gray-500 hover:bg-gray-50 border-t border-gray-100"
-        >
-          {expanded ? '접기' : `공지 ${list.length - COLLAPSED_COUNT}건 더 보기`}
-        </button>
+      {totalPages > 1 && (
+        <Pager page={curPage} totalPages={totalPages} total={list.length} onChange={setPage} />
       )}
 
       {openNotice && (
@@ -189,6 +192,53 @@ export default function NoticeBoard() {
         <NoticeEditor notice={editing.notice} onClose={() => setEditing(null)} />
       )}
     </section>
+  );
+}
+
+// ─── 페이지 이동 ────────────────────────────────────────────────────
+/** 페이지가 많아져도 버튼이 넘치지 않게 현재 페이지 주변만 보여 준다 */
+function pageWindow(page, totalPages, size = 5) {
+  const start = Math.max(1, Math.min(page - Math.floor(size / 2), totalPages - size + 1));
+  const end = Math.min(totalPages, start + size - 1);
+  const out = [];
+  for (let i = Math.max(1, start); i <= end; i++) out.push(i);
+  return out;
+}
+
+function Pager({ page, totalPages, total, onChange }) {
+  const btn = 'px-2 py-1 rounded text-xs font-medium disabled:opacity-40 disabled:cursor-default';
+  return (
+    <div className="flex items-center justify-center gap-1 py-2 border-t border-gray-100 bg-white">
+      <span className="mr-2 text-[11px] text-gray-400">전체 {total}건</span>
+      <button
+        onClick={() => onChange(page - 1)}
+        disabled={page <= 1}
+        className={`${btn} text-gray-500 hover:bg-gray-100`}
+        aria-label="이전 페이지"
+      >
+        ‹ 이전
+      </button>
+      {pageWindow(page, totalPages).map((p) => (
+        <button
+          key={p}
+          onClick={() => onChange(p)}
+          aria-current={p === page ? 'page' : undefined}
+          className={`${btn} min-w-[1.75rem] ${
+            p === page ? 'bg-mb-blue text-white' : 'text-gray-500 hover:bg-gray-100'
+          }`}
+        >
+          {p}
+        </button>
+      ))}
+      <button
+        onClick={() => onChange(page + 1)}
+        disabled={page >= totalPages}
+        className={`${btn} text-gray-500 hover:bg-gray-100`}
+        aria-label="다음 페이지"
+      >
+        다음 ›
+      </button>
+    </div>
   );
 }
 
