@@ -17,11 +17,20 @@ const ROLE_BADGE_CLS = {
   staff: 'bg-green-100 text-green-700',
   sales: 'bg-gray-100 text-gray-600',
 };
+// 역할별 사용자 매뉴얼 (권한에 맞는 매뉴얼만 노출 — 알 수 없는 역할은 최소 권한 매뉴얼로 폴백)
+const MANUAL_BY_ROLE = {
+  admin: '/manuals/manual-admin.html',
+  'staff-a': '/manuals/manual-staff-a.html',
+  'staff-b': '/manuals/manual-staff-b-sales.html',
+  staff: '/manuals/manual-staff-b-sales.html',
+  sales: '/manuals/manual-staff-b-sales.html',
+};
 
 export default function Layout({ children }) {
   const { profile, isAdmin, canViewDict, isBootstrap, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const manualUrl = MANUAL_BY_ROLE[profile?.role] || '/manuals/manual-staff-b-sales.html';
 
   async function handleSignOut() {
     await signOut();
@@ -100,6 +109,14 @@ export default function Layout({ children }) {
                   코드 사전
                 </NavLink>
               )}
+              <a
+                href={manualUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                사용자매뉴얼
+              </a>
             </nav>
 
             {/* 우측: 언어 토글 + 사용자 + 로그아웃 (데스크톱) + 햄버거 (모바일) */}
@@ -207,6 +224,15 @@ export default function Layout({ children }) {
                   코드 사전
                 </NavLink>
               )}
+              <a
+                href={manualUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+                className="block px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                사용자매뉴얼
+              </a>
               <div className="border-t border-gray-100 pt-2 mt-1">
                 <div className="px-3 py-2">
                   <LangToggle />
