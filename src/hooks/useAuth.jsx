@@ -57,7 +57,7 @@ export function AuthProvider({ children }) {
           }
           case EventType.LOGOUT_SUCCESS:
           case EventType.ACCOUNT_REMOVED:
-            // 다른 로그인 경로(정직원/에이전트)에 남은 계정이 있으면 그것으로 폴백
+            // 다른 로그인 경로(STK 소속/에이전트)에 남은 계정이 있으면 그것으로 폴백
             setMsAccount(getMicrosoftAccount());
             setRole(null);
             setIsAgent(false);

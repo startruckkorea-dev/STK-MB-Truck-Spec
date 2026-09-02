@@ -72,7 +72,7 @@ export default function Login() {
             </p>
           </div>
 
-          {/* 정직원 — 사내 앱 등록 */}
+          {/* STK 소속 — 사내 앱 등록 */}
           <button
             type="button"
             onClick={() => handleMicrosoftLogin('internal')}
@@ -80,7 +80,7 @@ export default function Login() {
             className="w-full flex items-center justify-center gap-2 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition disabled:opacity-60"
           >
             <MsLogo />
-            {pending === 'internal' ? '연결 중...' : '정직원 — Microsoft 365 계정으로 로그인'}
+            {pending === 'internal' ? '연결 중...' : 'STK 소속 — Microsoft 365 계정으로 로그인'}
           </button>
 
           {/* 구분선 */}

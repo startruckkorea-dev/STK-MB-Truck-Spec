@@ -46,7 +46,7 @@
 > 로 표기한다. A/B 구분 없는 단독 `Staff`/`본사` 는 기존 호환을 위해 `staff-b` 로 본다.
 
 - **로그인:** Microsoft 365 계정 (MSAL 팝업). 로그인 화면에 버튼이 **두 개**다.
-  - **정직원** — 사내 앱 등록(`9b247088-…`), 사내 계정.
+  - **STK 소속** — 사내 앱 등록(`9b247088-…`), 사내 계정.
   - **세일즈 에이전트** — `STK-Sales-Freelancer` 앱 등록(`0346d368-7dc6-41a6-a310-7afa10fa5bd7`),
     같은 테넌트. Access 리스트 `company` 컬럼이 `agent` 인 인원이며,
     **1인당 gmail / startruck.kr 두 개의 이메일** 중 아무 것으로나 로그인할 수 있다.
@@ -270,7 +270,7 @@ npx vercel deploy --prod --yes   # 운영 배포 → mbtruck-spec.startruckkorea
 
 ```
 # Microsoft 365 / MSAL — 미설정 시 msal.js 기본값
-VITE_MSAL_CLIENT_ID=...          # 정직원용 앱 등록
+VITE_MSAL_CLIENT_ID=...          # STK 소속용 앱 등록
 VITE_MSAL_AGENT_CLIENT_ID=...    # 세일즈 에이전트용 앱 등록(STK-Sales-Freelancer)
 VITE_MSAL_TENANT_ID=...
 
@@ -293,7 +293,7 @@ VITE_APP_TITLE=...
 ## SharePoint / Azure 설정
 
 **Azure Entra ID — SPA 앱 등록 (2개, 테넌트 공통):**
-- 정직원 Client ID: `9b247088-5afb-4622-9c5e-b5f27142761d`
+- STK 소속 Client ID: `9b247088-5afb-4622-9c5e-b5f27142761d`
 - 세일즈 에이전트 `STK-Sales-Freelancer` Client ID: `0346d368-7dc6-41a6-a310-7afa10fa5bd7`
   (Object ID `b97d1239-b4e7-4005-bf92-10268d8c16c9`)
 - Tenant ID: `19cab1f5-21f4-44df-8ac6-96d6ca595203`

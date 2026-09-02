@@ -5,7 +5,7 @@ import { PublicClientApplication, InteractionRequiredAuthError } from '@azure/ms
 // Vercel/로컬에서 VITE_MSAL_CLIENT_ID / VITE_MSAL_TENANT_ID 로 덮어쓸 수 있음.
 //
 // 앱 등록이 두 개다 (테넌트는 동일):
-//   internal — 정직원용 (STK 사내 계정)
+//   internal — STK 소속용 (사내 계정)
 //   agent    — 세일즈 에이전트용 (STK-Sales-Freelancer)
 //              Access 리스트의 company 컬럼이 `agent` 인 인원.
 //              1인당 gmail / startruck.kr 두 개의 계정으로 로그인 가능하다.
@@ -19,7 +19,7 @@ const AGENT_CLIENT_ID =
 
 /** 로그인 경로(앱 등록) 정의 */
 export const AUTH_APPS = {
-  internal: { key: 'internal', clientId: INTERNAL_CLIENT_ID, label: '정직원' },
+  internal: { key: 'internal', clientId: INTERNAL_CLIENT_ID, label: 'STK 소속' },
   agent: { key: 'agent', clientId: AGENT_CLIENT_ID, label: '세일즈 에이전트' },
 };
 
@@ -67,7 +67,7 @@ for (const key of AUTH_APP_KEYS) {
   instances[key] = new PublicClientApplication(buildConfig(AUTH_APPS[key].clientId));
 }
 
-/** 하위 호환 — 기본(정직원) 인스턴스 */
+/** 하위 호환 — 기본(STK 소속) 인스턴스 */
 export const msalInstance = instances.internal;
 
 // Graph API 위임 권한 (두 앱 등록 모두 관리자 동의 완료)
@@ -144,7 +144,7 @@ export async function initMsal() {
 
 /**
  * Microsoft 365 계정으로 로그인 (팝업). 성공 시 account 반환.
- * @param {'internal'|'agent'} appKey 로그인 경로(앱 등록). 기본값은 정직원.
+ * @param {'internal'|'agent'} appKey 로그인 경로(앱 등록). 기본값은 STK 소속.
  */
 export async function signInWithMicrosoft(appKey = DEFAULT_APP) {
   const key = AUTH_APPS[appKey] ? appKey : DEFAULT_APP;
