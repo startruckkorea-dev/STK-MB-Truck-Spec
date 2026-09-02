@@ -7,10 +7,15 @@
  * 위치: SharePoint `mbtruck-spec/Access/` 폴더 안의 .xlsx (예: Access_List_2026-06.xlsx).
  *       폴더 안에서 `Access_List*` 파일을 우선 선택하고, 없으면 첫 .xlsx 를 쓴다.
  *
- * 시트 구조(위치 기준):
- *   - G 컬럼(index 6) = 이메일 주소 (키 값)
- *   - H 컬럼(index 7) = 부여할 권한 (Admin / Staff / Sales)
+ * 시트 구조:
+ *   - G 컬럼(index 6) = 이메일 주소 (기본 키 값)
+ *   - H 컬럼(index 7) = 부여할 권한 (Admin / Staff-A / Staff-B / Sales)
  *   1행은 헤더로 보고, 이메일('@' 포함)이 있는 행만 사용한다.
+ *
+ * 추가 컬럼(위치 무관, 1행 헤더 이름으로 탐지):
+ *   - company/회사/소속 컬럼 값이 `agent` 인 행 = 세일즈 에이전트
+ *   - 이메일이 여러 컬럼(예: gmail / startruck.kr)에 있으면 모두 로그인 키로 인정한다.
+ *     (헤더에 mail/이메일/계정 이 들어간 컬럼 → 없으면 '@' 가 든 모든 셀)
  */
 
 import { graphGet } from './graph';
@@ -27,6 +32,25 @@ const EMAIL_COL = 6; // G
 const ROLE_COL = 7; // H
 
 const VALID_ROLES = new Set(['admin', 'staff-a', 'staff-b', 'sales']);
+
+/**
+ * 이메일 정규화. 외부(게스트) 계정의 UPN 은 Entra 에서
+ * `hong_gmail.com#EXT#@startruckkorea.onmicrosoft.com` 형태로 저장되므로
+ * 원래 주소(`hong@gmail.com`)로 되돌린다.
+ */
+export function normalizeEmail(raw) {
+  let v = String(raw ?? '').trim().toLowerCase();
+  const ext = v.match(/^(.+?)#ext#@/);
+  if (ext) v = ext[1].replace(/_([^_]*)$/, '@$1');
+  return v;
+}
+
+/** 로그인 계정 하나에서 나올 수 있는 이메일 후보(원본 + 게스트 UPN 복원) */
+export function emailCandidates(raw) {
+  const plain = String(raw ?? '').trim().toLowerCase();
+  const normalized = normalizeEmail(raw);
+  return [...new Set([plain, normalized].filter((e) => e.includes('@')))];
+}
 
 /**
  * H 컬럼 값 → 역할 키(admin/staff-a/staff-b/sales). 영문/한글 표기를 허용한다.
@@ -48,6 +72,19 @@ export function normalizeRole(raw) {
   }
   if (/(sales|영업)/.test(v)) return 'sales';
   return null;
+}
+
+/** 1행(헤더)에서 company / 추가 이메일 컬럼 위치를 찾는다. */
+function detectColumns(headerRow) {
+  const cells = (headerRow || []).map((c) => String(c ?? '').trim().toLowerCase());
+  let companyCol = -1;
+  const emailCols = [];
+  cells.forEach((h, i) => {
+    if (!h) return;
+    if (companyCol < 0 && /(company|회사|소속)/.test(h)) companyCol = i;
+    if (/(mail|이메일|메일|계정|account)/.test(h)) emailCols.push(i);
+  });
+  return { companyCol, emailCols };
 }
 
 // ─── 파일(워크북) 위치 해석 — 1회 캐시 ───────────────────────────────
@@ -85,8 +122,11 @@ function resolveAccessFile() {
 }
 
 /**
- * 접근권한 목록을 [{ email, role }] 로 반환한다.
- * email 은 소문자로 정규화, role 은 admin/staff/sales 중 하나.
+ * 접근권한 목록을 [{ email, emails, role, company, isAgent }] 로 반환한다.
+ *   - email  : G 컬럼(대표 이메일, 소문자)
+ *   - emails : 이 사람이 로그인에 쓸 수 있는 모든 이메일 (gmail / startruck.kr 등)
+ *   - role   : admin/staff-a/staff-b/sales 중 하나 또는 null
+ *   - isAgent: company 컬럼이 `agent` 인 세일즈 에이전트 여부
  */
 export async function readAccessList() {
   const { siteId, itemId } = await resolveAccessFile();
@@ -104,11 +144,33 @@ export async function readAccessList() {
     `${wb}/worksheets('${sheetName}')/usedRange(valuesOnly=true)?$select=values`
   );
   const values = r?.values || [];
+  const { companyCol, emailCols } = detectColumns(values[0]);
   const out = [];
   for (const row of values) {
-    const email = String(row?.[EMAIL_COL] ?? '').trim().toLowerCase();
-    if (!email.includes('@')) continue; // 헤더/빈 행 제외
-    out.push({ email, role: normalizeRole(row?.[ROLE_COL]) });
+    const primary = String(row?.[EMAIL_COL] ?? '').trim().toLowerCase();
+    if (!primary.includes('@')) continue; // 헤더/빈 행 제외
+
+    // 이 행에서 인정할 이메일들 — 헤더로 찾은 이메일 컬럼이 있으면 그 컬럼들,
+    // 없으면 '@' 가 든 모든 셀 (한 행 = 한 사람이므로 같은 사람의 계정으로 본다)
+    const sourceCols =
+      emailCols.length > 0
+        ? [EMAIL_COL, ...emailCols]
+        : row.map((_, i) => i);
+    const emails = [];
+    for (const i of sourceCols) {
+      for (const e of emailCandidates(row?.[i])) {
+        if (!emails.includes(e)) emails.push(e);
+      }
+    }
+
+    const company = companyCol >= 0 ? String(row?.[companyCol] ?? '').trim() : '';
+    out.push({
+      email: primary,
+      emails,
+      role: normalizeRole(row?.[ROLE_COL]),
+      company,
+      isAgent: /agent|에이전트/i.test(company),
+    });
   }
   return out;
 }

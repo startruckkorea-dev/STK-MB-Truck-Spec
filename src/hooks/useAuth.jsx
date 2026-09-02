@@ -1,12 +1,14 @@
 import { useState, useEffect, createContext, useContext, useMemo } from 'react';
 import { EventType } from '@azure/msal-browser';
 import {
-  msalInstance,
+  addAuthEventCallback,
+  getActiveAuthApp,
+  getMsalInstance,
   initMsal,
   getMicrosoftAccount,
   signOutMicrosoft,
 } from '../lib/msal';
-import { readAccessList } from '../lib/accessList';
+import { readAccessList, emailCandidates } from '../lib/accessList';
 
 const AuthContext = createContext(null);
 
@@ -20,6 +22,7 @@ export function AuthProvider({ children }) {
   const [msAccount, setMsAccount] = useState(null);
   const [msalReady, setMsalReady] = useState(false);
   const [role, setRole] = useState(null); // null = 아직 미확정 또는 권한 없음
+  const [isAgent, setIsAgent] = useState(false); // Access 목록 company 컬럼 = agent
   // 접근권한 목록 조회 결과 상태
   //   null         = 아직 확정 안 됨(로딩)
   //   'ok'         = 목록에 등록된 사용자 → role 부여
@@ -36,7 +39,7 @@ export function AuthProvider({ children }) {
       await initMsal();
       setMsAccount(getMicrosoftAccount());
       setMsalReady(true);
-      const callbackId = msalInstance.addEventCallback((event) => {
+      unsubscribe = addAuthEventCallback((event) => {
         switch (event.eventType) {
           // ⚠️ ACQUIRE_TOKEN_SUCCESS 는 처리하지 않는다 — 토큰 획득마다 계정 state 가
           //    갱신되면 효과 재실행 → 재요청 → 무한 루프가 된다.
@@ -44,7 +47,7 @@ export function AuthProvider({ children }) {
           case EventType.ACCOUNT_ADDED: {
             const acc = event.payload?.account;
             if (acc) {
-              msalInstance.setActiveAccount(acc);
+              getMsalInstance().setActiveAccount(acc);
               // 같은 계정이면 참조를 유지해 불필요한 재렌더/효과 재실행 방지
               setMsAccount((prev) =>
                 prev && prev.homeAccountId === acc.homeAccountId ? prev : acc
@@ -54,31 +57,37 @@ export function AuthProvider({ children }) {
           }
           case EventType.LOGOUT_SUCCESS:
           case EventType.ACCOUNT_REMOVED:
-            setMsAccount(null);
+            // 다른 로그인 경로(정직원/에이전트)에 남은 계정이 있으면 그것으로 폴백
+            setMsAccount(getMicrosoftAccount());
             setRole(null);
+            setIsAgent(false);
             setAccessStatus(null);
             break;
           default:
             break;
         }
       });
-      unsubscribe = () => callbackId && msalInstance.removeEventCallback(callbackId);
     })();
     return () => unsubscribe && unsubscribe();
   }, []);
 
   // ─── 역할 결정: Access List(.xlsx) 조회 ─────────────────────────
   useEffect(() => {
-    if (!msAccount) { setRole(null); setAccessStatus(null); return; }
+    if (!msAccount) { setRole(null); setIsAgent(false); setAccessStatus(null); return; }
     let cancelled = false;
     setRole(null);
     setAccessStatus(null); // 재조회 시 로딩 상태로
     (async () => {
-      const email = String(msAccount.username || '').trim().toLowerCase();
+      // 게스트(gmail 등) 계정은 UPN 이 `foo_gmail.com#EXT#@...` 형태라 원주소도 함께 본다.
+      const candidates = emailCandidates(msAccount.username);
       try {
         const access = await readAccessList();
         if (cancelled) return;
-        const match = access.find((a) => a.email === email);
+        // 한 사람이 여러 이메일(gmail / startruck.kr)로 등록될 수 있다 — 하나라도 맞으면 인정
+        const match = access.find((a) =>
+          (a.emails || [a.email]).some((e) => candidates.includes(e))
+        );
+        setIsAgent(!!match?.isAgent);
         const hasAdmin = access.some((a) => a.role === 'admin');
         if (match && match.role) {
           setRole(match.role); // admin/staff/sales (빈칸/미인식은 role=null 이라 제외)
@@ -92,7 +101,7 @@ export function AuthProvider({ children }) {
         }
       } catch {
         // 목록 파일을 못 읽음 → 권한 없음(콘텐츠 차단)
-        if (!cancelled) { setRole(null); setAccessStatus('error'); }
+        if (!cancelled) { setRole(null); setIsAgent(false); setAccessStatus('error'); }
       }
     })();
     return () => { cancelled = true; };
@@ -120,8 +129,8 @@ export function AuthProvider({ children }) {
       name: msAccount.name || msAccount.username,
       provider: 'microsoft',
     };
-    return { user: u, profile: { ...u, role } };
-  }, [msAccount, role]);
+    return { user: u, profile: { ...u, role, isAgent } };
+  }, [msAccount, role, isAgent]);
 
   const isAdmin = profile?.role === 'admin';
   const isStaffA = profile?.role === 'staff-a'; // 본사직원A (강화) — 숨김모델·코드사전 열람
@@ -156,6 +165,8 @@ export function AuthProvider({ children }) {
         isStaffA,
         isStaffB,
         isSales,
+        isAgent,
+        authApp: getActiveAuthApp(),
         canViewCodes,
         canViewHidden,
         canExportExcel,

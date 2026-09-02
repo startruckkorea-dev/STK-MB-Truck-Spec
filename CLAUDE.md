@@ -45,10 +45,20 @@
 > 본사직원은 A/B 두 단계다. `Access_List` 의 H 컬럼에 `Staff-A`/`Staff-B`(또는 `본사직원A`/`본사직원B`)
 > 로 표기한다. A/B 구분 없는 단독 `Staff`/`본사` 는 기존 호환을 위해 `staff-b` 로 본다.
 
-- **로그인:** Microsoft 365 회사 계정 (MSAL 팝업). 회사 계정이면 누구나 로그인된다.
+- **로그인:** Microsoft 365 계정 (MSAL 팝업). 로그인 화면에 버튼이 **두 개**다.
+  - **정직원** — 사내 앱 등록(`9b247088-…`), 사내 계정.
+  - **세일즈 에이전트** — `STK-Sales-Freelancer` 앱 등록(`0346d368-7dc6-41a6-a310-7afa10fa5bd7`),
+    같은 테넌트. Access 리스트 `company` 컬럼이 `agent` 인 인원이며,
+    **1인당 gmail / startruck.kr 두 개의 이메일** 중 아무 것으로나 로그인할 수 있다.
+    (게스트 계정 UPN `foo_gmail.com#EXT#@…` 는 앱이 `foo@gmail.com` 으로 복원해 대조한다.)
 - **역할:** SharePoint `Access` 폴더의 접근권한 엑셀(`Access_List_*.xlsx`)로만 관리한다.
   앱 안에는 사용자/역할 편집 화면이 없다 — **엑셀을 직접 편집**해야 한다.
   - `G` 컬럼 = 이메일(키), `H` 컬럼 = 권한(`Admin`/`Staff-A`/`Staff-B`/`Sales`). 1행은 헤더.
+  - 그 밖의 컬럼은 **1행 헤더 이름으로 위치를 자동 탐지**한다 (컬럼 순서 자유):
+    - 헤더에 `company`/`회사`/`소속` → 값이 `agent` 면 세일즈 에이전트로 표시.
+    - 헤더에 `mail`/`이메일`/`계정` 이 든 컬럼 = 추가 로그인 이메일. 한 사람에게
+      여러 이메일을 적으면 **아무 것으로 로그인해도 같은 권한**이 적용된다.
+      (이메일 헤더가 전혀 없으면 그 행에서 `@` 가 든 모든 셀을 같은 사람의 계정으로 본다.)
   - 역할은 앱에서 클릭으로 바꿀 수 없다(전환 UI 없음). 상단 바에 현재 역할 배지만 표시.
 - **부트스트랩:** 목록에 `admin` 이 한 명도 없으면 로그인한 사용자를 모두 `admin` 으로
   취급(최초 셋업/락아웃 방지). admin 이 한 명이라도 있으면 미등록 사용자는 `sales` 기본.
@@ -260,7 +270,8 @@ npx vercel deploy --prod --yes   # 운영 배포 → mbtruck-spec.startruckkorea
 
 ```
 # Microsoft 365 / MSAL — 미설정 시 msal.js 기본값
-VITE_MSAL_CLIENT_ID=...
+VITE_MSAL_CLIENT_ID=...          # 정직원용 앱 등록
+VITE_MSAL_AGENT_CLIENT_ID=...    # 세일즈 에이전트용 앱 등록(STK-Sales-Freelancer)
 VITE_MSAL_TENANT_ID=...
 
 # SharePoint 위치 — 미설정 시 workbook.js / sourceFiles.js / accessList.js 기본값
@@ -281,11 +292,14 @@ VITE_APP_TITLE=...
 
 ## SharePoint / Azure 설정
 
-**Azure Entra ID — SPA 앱 등록:**
-- Client ID: `9b247088-5afb-4622-9c5e-b5f27142761d`
+**Azure Entra ID — SPA 앱 등록 (2개, 테넌트 공통):**
+- 정직원 Client ID: `9b247088-5afb-4622-9c5e-b5f27142761d`
+- 세일즈 에이전트 `STK-Sales-Freelancer` Client ID: `0346d368-7dc6-41a6-a310-7afa10fa5bd7`
+  (Object ID `b97d1239-b4e7-4005-bf92-10268d8c16c9`)
 - Tenant ID: `19cab1f5-21f4-44df-8ac6-96d6ca595203`
 - 위임 권한(관리자 동의 완료): `User.Read`, `Sites.ReadWrite.All`, `Files.ReadWrite.All`, `Mail.Send`
 - 리디렉션 URI(SPA): `https://mbtruck-spec.startruckkorea.com` (로컬 테스트 시 `http://localhost:3000` 추가)
+  — ⚠️ **두 앱 등록 모두**에 등록해야 한다.
 
 **SharePoint:**
 - 사이트: `https://startruckkorea.sharepoint.com/sites/STK-PMM/`

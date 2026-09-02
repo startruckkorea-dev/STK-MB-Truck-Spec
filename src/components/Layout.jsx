@@ -27,7 +27,7 @@ const MANUAL_BY_ROLE = {
 };
 
 export default function Layout({ children }) {
-  const { profile, isAdmin, canViewDict, isBootstrap, signOut } = useAuth();
+  const { profile, isAdmin, canViewDict, isBootstrap, isAgent, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const manualUrl = MANUAL_BY_ROLE[profile?.role] || '/manuals/manual-staff-b-sales.html';
@@ -134,7 +134,7 @@ export default function Layout({ children }) {
                       ROLE_BADGE_CLS[profile.role] || ROLE_BADGE_CLS.sales
                     }`}
                   >
-                    {ROLE_LABEL[profile.role] || profile.role}
+                    {isAgent ? '세일즈 에이전트' : ROLE_LABEL[profile.role] || profile.role}
                   </span>
                 )}
               </div>
@@ -247,7 +247,7 @@ export default function Layout({ children }) {
                         ROLE_BADGE_CLS[profile.role] || ROLE_BADGE_CLS.sales
                       }`}
                     >
-                      {ROLE_LABEL[profile.role] || profile.role}
+                      {isAgent ? '세일즈 에이전트' : ROLE_LABEL[profile.role] || profile.role}
                     </span>
                   )}
                 </div>

@@ -3,8 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { signInWithMicrosoft } from '../lib/msal';
 
+function MsLogo() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 23 23" aria-hidden="true">
+      <rect x="1" y="1" width="10" height="10" fill="#F25022" />
+      <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
+      <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
+      <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
+    </svg>
+  );
+}
+
 export default function Login() {
-  const [loading, setLoading] = useState(false);
+  // 진행 중인 로그인 경로 ('internal' | 'agent' | null)
+  const [pending, setPending] = useState(null);
   const [error, setError] = useState('');
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -16,11 +28,11 @@ export default function Login() {
     }
   }, [authLoading, user, navigate]);
 
-  async function handleMicrosoftLogin() {
+  async function handleMicrosoftLogin(appKey) {
     setError('');
-    setLoading(true);
+    setPending(appKey);
     try {
-      await signInWithMicrosoft();
+      await signInWithMicrosoft(appKey);
       navigate('/models', { replace: true });
     } catch (err) {
       if (err?.errorCode !== 'user_cancelled') {
@@ -31,7 +43,7 @@ export default function Login() {
         );
       }
     } finally {
-      setLoading(false);
+      setPending(null);
     }
   }
 
@@ -60,19 +72,38 @@ export default function Login() {
             </p>
           </div>
 
+          {/* 정직원 — 사내 앱 등록 */}
           <button
             type="button"
-            onClick={handleMicrosoftLogin}
-            disabled={loading}
+            onClick={() => handleMicrosoftLogin('internal')}
+            disabled={!!pending}
             className="w-full flex items-center justify-center gap-2 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition disabled:opacity-60"
           >
-            <svg className="w-4 h-4" viewBox="0 0 23 23" aria-hidden="true">
-              <rect x="1" y="1" width="10" height="10" fill="#F25022" />
-              <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
-              <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
-              <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
-            </svg>
-            {loading ? '연결 중...' : 'Microsoft 365 계정으로 로그인'}
+            <MsLogo />
+            {pending === 'internal' ? '연결 중...' : '정직원 — Microsoft 365 계정으로 로그인'}
+          </button>
+
+          {/* 구분선 */}
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-gray-200" />
+            <span className="text-[11px] text-gray-400">또는</span>
+            <span className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          {/* 세일즈 에이전트 — STK-Sales-Freelancer 앱 등록 */}
+          <button
+            type="button"
+            onClick={() => handleMicrosoftLogin('agent')}
+            disabled={!!pending}
+            className="w-full flex flex-col items-center gap-1 py-3 rounded-lg text-sm font-medium text-white bg-mb-blue hover:bg-mb-blue-dark transition disabled:opacity-60"
+          >
+            <span className="flex items-center justify-center gap-2">
+              <MsLogo />
+              {pending === 'agent' ? '연결 중...' : '세일즈 에이전트 로그인'}
+            </span>
+            <span className="text-[11px] font-normal text-white/80">
+              gmail.com / startruck.kr 계정
+            </span>
           </button>
 
           {error && (
