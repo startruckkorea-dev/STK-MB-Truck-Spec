@@ -65,13 +65,6 @@ export default function Login() {
 
         {/* 로그인 카드 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 space-y-5">
-          <div className="text-center space-y-1">
-            <p className="font-medium text-gray-800">사내 계정으로 로그인</p>
-            <p className="text-xs text-gray-500">
-              Microsoft 365 계정으로 접속하세요.
-            </p>
-          </div>
-
           {/* STK 소속 — 사내 앱 등록 */}
           <button
             type="button"
@@ -114,7 +107,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          Mercedes-Benz Trucks Korea — 사내 전용
+          스타트럭코리아
         </p>
       </div>
     </div>
