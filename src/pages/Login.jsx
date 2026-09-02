@@ -3,6 +3,30 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { signInWithMicrosoft } from '../lib/msal';
 
+/**
+ * MSAL 오류 → 사용자에게 보여줄 안내 문구.
+ * AADSTS 코드별로 원인이 분명한 것은 한국어로 풀어 준다.
+ */
+function loginErrorMessage(err, appKey) {
+  const detail = String(err?.errorMessage || err?.message || '');
+  const code = err?.errorCode || 'unknown';
+  const appName = appKey === 'agent' ? '세일즈 에이전트' : 'STK 소속';
+
+  // 앱 등록에 '할당 필요=예' 인데 계정이 할당되지 않음
+  if (detail.includes('AADSTS50105')) {
+    return `이 계정은 ${appName} 로그인에 사용할 수 없습니다. 관리자가 Entra 엔터프라이즈 앱 > 사용자 및 그룹에 계정을 할당해야 합니다. (AADSTS50105)`;
+  }
+  // 리디렉션 URI 미등록
+  if (detail.includes('AADSTS50011')) {
+    return `앱 등록에 이 주소의 리디렉션 URI 가 없습니다. 관리자에게 문의하세요. (AADSTS50011)`;
+  }
+  // 테넌트에 없는 계정
+  if (detail.includes('AADSTS50020') || detail.includes('AADSTS700016')) {
+    return `이 조직에 등록되지 않은 계정입니다. 관리자에게 초대(게스트 등록)를 요청하세요.`;
+  }
+  return `Microsoft 365 로그인 중 오류가 발생했습니다. (${code})`;
+}
+
 function MsLogo() {
   return (
     <svg className="w-4 h-4" viewBox="0 0 23 23" aria-hidden="true">
@@ -36,11 +60,7 @@ export default function Login() {
       navigate('/models', { replace: true });
     } catch (err) {
       if (err?.errorCode !== 'user_cancelled') {
-        setError(
-          'Microsoft 365 로그인 중 오류가 발생했습니다. (' +
-            (err?.errorCode || err?.message || 'unknown') +
-            ')',
-        );
+        setError(loginErrorMessage(err, appKey));
       }
     } finally {
       setPending(null);
