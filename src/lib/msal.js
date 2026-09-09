@@ -19,8 +19,8 @@ const AGENT_CLIENT_ID =
 
 /** 로그인 경로(앱 등록) 정의 */
 export const AUTH_APPS = {
-  internal: { key: 'internal', clientId: INTERNAL_CLIENT_ID, label: 'STK 소속' },
-  agent: { key: 'agent', clientId: AGENT_CLIENT_ID, label: '세일즈 에이전트' },
+  internal: { key: 'internal', clientId: INTERNAL_CLIENT_ID, label: 'HYOSUNG (STK 소속)' },
+  agent: { key: 'agent', clientId: AGENT_CLIENT_ID, label: 'Google (세일즈 에이전트)' },
 };
 
 export const AUTH_APP_KEYS = Object.keys(AUTH_APPS);
