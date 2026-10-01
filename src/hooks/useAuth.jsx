@@ -22,13 +22,14 @@ export function AuthProvider({ children }) {
   const [msAccount, setMsAccount] = useState(null);
   const [msalReady, setMsalReady] = useState(false);
   const [role, setRole] = useState(null); // null = 아직 미확정 또는 권한 없음
-  const [isAgent, setIsAgent] = useState(false); // Access 목록 company 컬럼 = agent
+  const [isAgent, setIsAgent] = useState(false); // 세일즈 에이전트(Google 로그인) 여부
   // 접근권한 목록 조회 결과 상태
   //   null         = 아직 확정 안 됨(로딩)
   //   'ok'         = 목록에 등록된 사용자 → role 부여
   //   'bootstrap'  = 목록이 비어 admin 부재 → 임시 admin (경고 표시)
   //   'unregistered' = 목록엔 있으나 본인 미등록 → 콘텐츠 차단
   //   'error'      = 목록 파일을 못 읽음 → 콘텐츠 차단
+  //   'entra'      = 세일즈 에이전트(Google) — Entra 앱 할당으로만 통제, 목록 조회 안 함
   const [accessStatus, setAccessStatus] = useState(null);
   const [recheckTick, setRecheckTick] = useState(0);
 
@@ -71,11 +72,23 @@ export function AuthProvider({ children }) {
     return () => unsubscribe && unsubscribe();
   }, []);
 
-  // ─── 역할 결정: Access List(.xlsx) 조회 ─────────────────────────
+  // ─── 역할 결정 ─────────────────────────────────────────────────
+  //   • 세일즈 에이전트(Google 배너) → Entra 앱 할당이 곧 접근권한.
+  //     `STK-Sales-Freelancer` 앱은 '할당 필요=예' 라서 관리자가 할당한 계정만
+  //     로그인 자체가 된다. 따라서 Access 엑셀을 보지 않고 바로 sales 로 둔다
+  //     (에이전트는 SharePoint Access 폴더 읽기 권한이 없을 수 있다).
+  //   • STK 소속(HYOSUNG 배너) → 기존대로 Access List(.xlsx) 로 역할 결정.
   useEffect(() => {
     if (!msAccount) { setRole(null); setIsAgent(false); setAccessStatus(null); return; }
+    if (getActiveAuthApp() === 'agent') {
+      setIsAgent(true);
+      setRole('sales');
+      setAccessStatus('entra');
+      return;
+    }
     let cancelled = false;
     setRole(null);
+    setIsAgent(false);
     setAccessStatus(null); // 재조회 시 로딩 상태로
     (async () => {
       // 게스트(gmail 등) 계정은 UPN 이 `foo_gmail.com#EXT#@...` 형태라 원주소도 함께 본다.
@@ -87,7 +100,6 @@ export function AuthProvider({ children }) {
         const match = access.find((a) =>
           (a.emails || [a.email]).some((e) => candidates.includes(e))
         );
-        setIsAgent(!!match?.isAgent);
         const hasAdmin = access.some((a) => a.role === 'admin');
         if (match && match.role) {
           setRole(match.role); // admin/staff/sales (빈칸/미인식은 role=null 이라 제외)
@@ -101,7 +113,7 @@ export function AuthProvider({ children }) {
         }
       } catch {
         // 목록 파일을 못 읽음 → 권한 없음(콘텐츠 차단)
-        if (!cancelled) { setRole(null); setIsAgent(false); setAccessStatus('error'); }
+        if (!cancelled) { setRole(null); setAccessStatus('error'); }
       }
     })();
     return () => { cancelled = true; };

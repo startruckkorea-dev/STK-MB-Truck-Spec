@@ -47,11 +47,15 @@
 
 - **로그인:** Microsoft 365 계정 (MSAL 팝업). 로그인 화면에 버튼이 **두 개**다.
   - **STK 소속** — 사내 앱 등록(`9b247088-…`), 사내 계정.
-  - **세일즈 에이전트** — `STK-Sales-Freelancer` 앱 등록(`0346d368-7dc6-41a6-a310-7afa10fa5bd7`),
-    같은 테넌트. Access 리스트 `company` 컬럼이 `agent` 인 인원이며,
-    **1인당 gmail / startruck.kr 두 개의 이메일** 중 아무 것으로나 로그인할 수 있다.
-    (게스트 계정 UPN `foo_gmail.com#EXT#@…` 는 앱이 `foo@gmail.com` 으로 복원해 대조한다.)
-- **역할:** SharePoint `Access` 폴더의 접근권한 엑셀(`Access_List_*.xlsx`)로만 관리한다.
+  - **Google 계정으로 로그인** (세일즈 에이전트) — `STK-Sales-Freelancer` 앱 등록
+    (`0346d368-7dc6-41a6-a310-7afa10fa5bd7`), 같은 테넌트. gmail / startruck.kr 계정으로
+    로그인하며(1인당 2개 가능), 실제 인증은 Entra 게스트 + Google 페더레이션이다.
+    ⚠️ **이 경로는 Access 엑셀을 조회하지 않는다.** 이 앱은 Entra 엔터프라이즈 앱에서
+    **'할당 필요 = 예'** 로 두어, 관리자가 **사용자 및 그룹**에 할당한 계정만 로그인된다.
+    = 접근 통제는 Entra 할당 목록이 전담하고, 역할은 무조건 `sales` 로 고정된다
+    (에이전트에게 SharePoint `Access` 폴더 읽기 권한을 주지 않아도 된다).
+    에이전트 추가/제거는 **Entra 엔터프라이즈 앱 > 사용자 및 그룹**에서 한다.
+- **역할(STK 소속 로그인에 한함):** SharePoint `Access` 폴더의 접근권한 엑셀(`Access_List_*.xlsx`)로 관리한다.
   앱 안에는 사용자/역할 편집 화면이 없다 — **엑셀을 직접 편집**해야 한다.
   - `G` 컬럼 = 이메일(키), `H` 컬럼 = 권한(`Admin`/`Staff-A`/`Staff-B`/`Sales`). 1행은 헤더.
   - 그 밖의 컬럼은 **1행 헤더 이름으로 위치를 자동 탐지**한다 (컬럼 순서 자유):
