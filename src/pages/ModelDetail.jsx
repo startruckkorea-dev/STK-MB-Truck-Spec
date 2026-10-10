@@ -12,6 +12,10 @@ import { useData } from '../contexts/DataContext';
 import { exportDetailToExcel, exportDetailToPDF } from '../lib/export';
 import { logDownload } from '../lib/activityLog';
 import { parseHomologNo } from '../lib/homologNo';
+import { normCode } from '../lib/codeIndex';
+import ColorSwatch from '../components/ColorSwatch';
+
+const COLOR_CODE_RE = /^MB\s*\d{4}$/i;
 
 
 // 인증 자료 링크 버튼 — 링크가 있으면 새 탭으로 SharePoint 열기, 없으면 비활성.
@@ -66,6 +70,19 @@ export default function ModelDetail() {
       setSpecs((prev) => prev.map((s) => (s.id === specId ? { ...s, is_hidden: currentValue } : s)));
     }
   }, [setSpecHidden]);
+
+  // 대표 외장컬러: is_color 사양 중 sort_order 가 가장 앞선 "MB ####" 코드
+  const mainColor = (() => {
+    const spec = specs
+      .filter((s) => s.is_color && COLOR_CODE_RE.test(String(s.spec_value || '').trim()))
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0];
+    if (!spec) return null;
+    const code = String(spec.spec_value).trim();
+    const entry = dict[code] || dict[normCode(code)];
+    if (!entry?.hex_color) return null;
+    const name = (lang === 'en' ? entry.name_en || entry.name_ko : entry.name_ko || entry.name_en) || code;
+    return { hex: entry.hex_color, name };
+  })();
 
   if (loading) {
     return (
@@ -129,6 +146,15 @@ export default function ModelDetail() {
             </h1>
             {model.code_desc && (
               <p className="text-xs sm:text-sm text-gray-400 mt-1">{model.code_desc}</p>
+            )}
+            {mainColor && (
+              <div className="mt-1.5 text-xs sm:text-sm">
+                <ColorSwatch
+                  hexColor={mainColor.hex}
+                  label={mainColor.name}
+                  size="sm"
+                />
+              </div>
             )}
             {parseHomologNo(model.homolog_spec_url) && (
               <p className="text-xs sm:text-sm text-gray-500 mt-1">
