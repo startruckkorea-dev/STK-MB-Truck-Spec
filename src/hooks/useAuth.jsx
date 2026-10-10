@@ -9,6 +9,7 @@ import {
   signOutMicrosoft,
 } from '../lib/msal';
 import { readAccessList, emailCandidates } from '../lib/accessList';
+import { setLogIdentity, logVisitOnce } from '../lib/activityLog';
 
 const AuthContext = createContext(null);
 
@@ -144,6 +145,16 @@ export function AuthProvider({ children }) {
     return { user: u, profile: { ...u, role, isAgent } };
   }, [msAccount, role, isAgent]);
 
+  // 콘텐츠를 막아야 하는 상태 (읽기 실패 / 미등록 사용자)
+  const accessDenied = accessStatus === 'error' || accessStatus === 'unregistered';
+
+  // 접속 기록 — 역할이 확정되고 콘텐츠 접근이 허용될 때 탭·일자당 1회
+  useEffect(() => {
+    if (!user || !role || accessDenied) return;
+    setLogIdentity({ email: user.email, name: user.name, role });
+    logVisitOnce();
+  }, [user, role, accessDenied]);
+
   const isAdmin = profile?.role === 'admin';
   const isStaffA = profile?.role === 'staff-a'; // 본사직원A (강화) — 숨김모델·코드사전 열람
   const isStaffB = profile?.role === 'staff-b'; // 본사직원B (기존 staff 동급)
@@ -161,8 +172,6 @@ export function AuthProvider({ children }) {
   const canEditDict = isAdmin;
   // 모델 관리(등록/수정): admin 전용
   const canManageModels = isAdmin;
-  // 콘텐츠를 막아야 하는 상태 (읽기 실패 / 미등록 사용자)
-  const accessDenied = accessStatus === 'error' || accessStatus === 'unregistered';
   const isBootstrap = accessStatus === 'bootstrap';
 
   return (

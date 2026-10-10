@@ -129,6 +129,16 @@
 - `code_dict` 시트 CRUD (영문 코드 ↔ 국문명, 분류, HEX 컬러, 숨김)
 - 상단 패널에서 SharePoint Excel 파일 바로 열기 + [다시 불러오기]
 
+### 6-1. 관리자 — 사용 통계 (`/admin/stats`)
+- 상단 메뉴 `통계` (admin 전용). 일자별 접속자 수, 사용자별 접속 현황, 다운로드(Excel/PDF) 내역.
+- 기간 7/30/90일 선택. 접속은 탭(세션)·일자당 1회, 다운로드는 상세/비교 페이지 버튼 클릭 시 기록.
+- 기록은 SharePoint `mbtruck-spec/Log/` 폴더에 **사용자별 JSON**(`{이메일}.json`)으로 저장
+  (최근 120일·최대 3000건 보관). 각자 자기 파일에만 쓰므로 충돌이 없다.
+- ⚠️ `Log` 폴더는 **앱 사용자 전원에게 "편집" 권한**이 있어야 기록된다(없으면 조용히 건너뜀).
+  폴더는 첫 기록 때 앱이 자동 생성한다.
+- [src/pages/admin/AdminStats.jsx](src/pages/admin/AdminStats.jsx),
+  [src/lib/activityLog.js](src/lib/activityLog.js)
+
 ### 7. 사용자 권한 관리 — 앱 화면 없음
 - 역할은 SharePoint `Access` 폴더의 `Access_List_*.xlsx` 를 **직접 편집**해 관리한다
   (`G`=이메일, `H`=권한). 앱에는 사용자 관리 화면이 없다.
@@ -179,6 +189,7 @@
 | [src/lib/pictures.js](src/lib/pictures.js) | SharePoint 모델 사진 폴더 자동 매칭·조회(상세 화면 갤러리) |
 | [src/lib/specImages.js](src/lib/specImages.js) | SharePoint `spec_picture` 폴더 조회 → 코드별 사양 이미지 인덱스(파일명=코드명 매칭) + 업로드/삭제. 상세 사양행 [보기] 버튼·코드사전 미리보기·편집 모달 업로드에 사용 |
 | [src/lib/notices.js](src/lib/notices.js) | 공지 첨부파일 SharePoint `Notice` 폴더 업로드·삭제·다운로드 URL 재발급 |
+| [src/lib/activityLog.js](src/lib/activityLog.js) | 접속·다운로드 기록(SharePoint `Log` 폴더, 사용자별 JSON) 기록·조회 — 관리자 통계용 |
 | [src/lib/accessList.js](src/lib/accessList.js) | SharePoint `Access` 폴더 접근권한 엑셀(G=이메일, H=권한) 읽기 |
 | [src/lib/codeIndex.js](src/lib/codeIndex.js) | `code_dict` → 코드 인덱스, 사양값 번역 매칭 |
 | [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 데이터 4개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
@@ -287,6 +298,7 @@ VITE_SP_PICTURES_PATH=mbtruck-spec/Pictures    # 모델 사진 원본 폴더
 VITE_SP_SPEC_PICTURES_PATH=mbtruck-spec/spec_picture  # 사양 코드별 이미지 폴더(파일명=코드명)
 VITE_SP_ACCESS_PATH=mbtruck-spec/Access        # 접근권한 엑셀(Access_List_*.xlsx) 폴더
 VITE_SP_NOTICE_PATH=mbtruck-spec/Notice        # 공지사항 첨부파일 폴더(앱이 없으면 자동 생성)
+VITE_SP_LOG_PATH=mbtruck-spec/Log              # 접속·다운로드 기록 폴더(앱이 없으면 자동 생성)
 
 # 앱 타이틀
 VITE_APP_TITLE=...
@@ -333,6 +345,9 @@ VITE_APP_TITLE=...
 - 공지 첨부파일 폴더: `Shared Documents/mbtruck-spec/Notice/` (평면 폴더, 없으면 앱이 자동 생성)
   - 관리자가 공지에 첨부한 이미지·PDF·문서가 `{타임스탬프}-{원본파일명}` 으로 저장된다.
   - 공지 수정에서 첨부를 지우면 이 폴더의 파일도 함께 삭제된다.
+- 사용 기록 폴더: `Shared Documents/mbtruck-spec/Log/` (평면 폴더, 없으면 앱이 자동 생성)
+  - 사용자별 `{이메일}.json` 에 접속·다운로드 이벤트가 쌓인다. **앱 사용자 전원 "편집" 권한 필요.**
+  - 관리자 `/admin/stats` 화면이 이 폴더 전체를 읽어 집계한다.
 - 앱 사용자는 이 파일 "읽기" 권한, 관리자는 "편집" 권한 필요.
 
 ---

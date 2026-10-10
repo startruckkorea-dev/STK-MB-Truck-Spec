@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useSpecLang } from '../hooks/useSpecLang';
 import { useData } from '../contexts/DataContext';
 import { exportDetailToExcel, exportDetailToPDF } from '../lib/export';
+import { logDownload } from '../lib/activityLog';
 
 
 // 인증 자료 링크 버튼 — 링크가 있으면 새 탭으로 SharePoint 열기, 없으면 비활성.
@@ -32,6 +33,8 @@ function HomologButton({ url, label }) {
     </Button>
   );
 }
+
+const modelLabel = (m) => [m.series, m.code, m.axle, m.cabin, m.model_year && `MY${m.model_year}`].filter(Boolean).join(' ');
 
 export default function ModelDetail() {
   const { id } = useParams();
@@ -152,7 +155,7 @@ export default function ModelDetail() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => exportDetailToExcel(model, specs, dict, notes, lang, exportCodes)}
+                onClick={() => { logDownload('excel', 'detail', modelLabel(model)); exportDetailToExcel(model, specs, dict, notes, lang, exportCodes); }}
               >
                 Excel
               </Button>
@@ -160,7 +163,7 @@ export default function ModelDetail() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportDetailToPDF(model, specs, dict, notes, lang, exportCodes, user?.email)}
+              onClick={() => { logDownload('pdf', 'detail', modelLabel(model)); exportDetailToPDF(model, specs, dict, notes, lang, exportCodes, user?.email); }}
             >
               PDF
             </Button>

@@ -8,6 +8,9 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../hooks/useAuth';
 import { isModelHiddenForSales } from '../lib/modelSort';
 import { exportCompareToExcel, exportCompareToPDF } from '../lib/export';
+import { logDownload } from '../lib/activityLog';
+
+const compareLabel = (ms) => ms.map((m) => [m.series, m.code, m.axle, m.cabin].filter(Boolean).join(' ')).join(' vs ');
 
 export default function Compare() {
   const [searchParams] = useSearchParams();
@@ -107,7 +110,7 @@ export default function Compare() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes)}
+              onClick={() => { logDownload('excel', 'compare', compareLabel(models)); exportCompareToExcel(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes); }}
               disabled={loading || models.length === 0}
             >
               Excel
@@ -116,7 +119,7 @@ export default function Compare() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes, user?.email)}
+            onClick={() => { logDownload('pdf', 'compare', compareLabel(models)); exportCompareToPDF(models, specsMap, dict, notesMap, showDiffOnly, lang, exportCodes, user?.email); }}
             disabled={loading || models.length === 0}
           >
             PDF

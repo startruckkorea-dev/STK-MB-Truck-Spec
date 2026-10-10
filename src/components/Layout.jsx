@@ -109,6 +109,20 @@ export default function Layout({ children }) {
                   코드 사전
                 </NavLink>
               )}
+              {isAdmin && (
+                <NavLink
+                  to="/admin/stats"
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-mb-blue text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`
+                  }
+                >
+                  통계
+                </NavLink>
+              )}
               <a
                 href={manualUrl}
                 target="_blank"
@@ -222,6 +236,21 @@ export default function Layout({ children }) {
                   }
                 >
                   코드 사전
+                </NavLink>
+              )}
+              {isAdmin && (
+                <NavLink
+                  to="/admin/stats"
+                  onClick={() => setMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-mb-blue text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`
+                  }
+                >
+                  통계
                 </NavLink>
               )}
               <a

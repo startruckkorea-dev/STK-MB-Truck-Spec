@@ -11,6 +11,7 @@ import ColorCodes from './pages/ColorCodes';
 import AdminModels from './pages/admin/AdminModels';
 import AdminModelEdit from './pages/admin/AdminModelEdit';
 import AdminDict from './pages/admin/AdminDict';
+import AdminStats from './pages/admin/AdminStats';
 import AccessNotice from './components/AccessNotice';
 
 // ─── 라우트 가드 ──────────────────────────────────────────────
@@ -82,6 +83,7 @@ export default function App() {
       <Route path="/admin/models" element={<RequireAdmin><AdminModels /></RequireAdmin>} />
       <Route path="/admin/models/new" element={<RequireAdmin><AdminModelEdit /></RequireAdmin>} />
       <Route path="/admin/models/:id/edit" element={<RequireAdmin><AdminModelEdit /></RequireAdmin>} />
+      <Route path="/admin/stats" element={<RequireAdmin><AdminStats /></RequireAdmin>} />
       <Route path="/admin/dict" element={<RequireDict><AdminDict /></RequireDict>} />
 
       {/* 기본 리다이렉트 */}
