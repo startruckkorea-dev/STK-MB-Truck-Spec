@@ -189,6 +189,7 @@ export default function HomologNumbers() {
                     <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
                     <th className="px-3 py-2.5 font-medium whitespace-nowrap">제원관리번호</th>
                     <th className="px-3 py-2.5 font-medium whitespace-nowrap">제원표</th>
+                    <th className="px-3 py-2.5 font-medium whitespace-nowrap">도면파일</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -255,6 +256,20 @@ export default function HomologNumbers() {
                               title={file}
                             >
                               📄 열기
+                            </a>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-xs whitespace-nowrap">
+                          {model.homolog_view_url ? (
+                            <a
+                              href={model.homolog_view_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-mb-blue hover:underline"
+                                                          >
+                              📐 열기
                             </a>
                           ) : (
                             <span className="text-gray-300">—</span>
