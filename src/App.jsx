@@ -8,6 +8,7 @@ import Models from './pages/Models';
 import ModelDetail from './pages/ModelDetail';
 import Compare from './pages/Compare';
 import ColorCodes from './pages/ColorCodes';
+import HomologNumbers from './pages/HomologNumbers';
 import AdminModels from './pages/admin/AdminModels';
 import AdminModelEdit from './pages/admin/AdminModelEdit';
 import AdminDict from './pages/admin/AdminDict';
@@ -78,6 +79,7 @@ export default function App() {
       <Route path="/models/:id" element={<RequireAuth><ModelDetail /></RequireAuth>} />
       <Route path="/compare" element={<RequireAuth><Compare /></RequireAuth>} />
       <Route path="/colors" element={<RequireAuth><ColorCodes /></RequireAuth>} />
+      <Route path="/homolog" element={<RequireAuth><HomologNumbers /></RequireAuth>} />
 
       {/* admin 전용 */}
       <Route path="/admin/models" element={<RequireAdmin><AdminModels /></RequireAdmin>} />

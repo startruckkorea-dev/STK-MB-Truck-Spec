@@ -11,6 +11,7 @@ import { useSpecLang } from '../hooks/useSpecLang';
 import { useData } from '../contexts/DataContext';
 import { exportDetailToExcel, exportDetailToPDF } from '../lib/export';
 import { logDownload } from '../lib/activityLog';
+import { parseHomologNo } from '../lib/homologNo';
 
 
 // 인증 자료 링크 버튼 — 링크가 있으면 새 탭으로 SharePoint 열기, 없으면 비활성.
@@ -128,6 +129,12 @@ export default function ModelDetail() {
             </h1>
             {model.code_desc && (
               <p className="text-xs sm:text-sm text-gray-400 mt-1">{model.code_desc}</p>
+            )}
+            {parseHomologNo(model.homolog_spec_url) && (
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                제원관리번호{' '}
+                <span className="font-mono text-gray-800">{parseHomologNo(model.homolog_spec_url)}</span>
+              </p>
             )}
           </div>
           <div className="flex gap-2 flex-shrink-0 flex-wrap items-center">

@@ -127,6 +127,18 @@ export default function Layout({ children }) {
               >
                 색상코드
               </NavLink>
+              <NavLink
+                to="/homolog"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-mb-blue text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`
+                }
+              >
+                제원관리번호
+              </NavLink>
               {showAdminMenu && <AdminMenu isAdmin={isAdmin} canViewDict={canViewDict} />}
               <a
                 href={manualUrl}
@@ -212,6 +224,19 @@ export default function Layout({ children }) {
                 }
               >
                 색상코드
+              </NavLink>
+              <NavLink
+                to="/homolog"
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-mb-blue text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`
+                }
+              >
+                제원관리번호
               </NavLink>
               {showAdminMenu && (
                 <div className="pt-1">
