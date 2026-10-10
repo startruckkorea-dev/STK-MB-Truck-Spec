@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import LangToggle from './ui/LangToggle';
 
@@ -26,10 +26,56 @@ const MANUAL_BY_ROLE = {
   sales: '/manuals/manual-staff-b-sales.html',
 };
 
+const navCls = ({ isActive }) =>
+  `block px-3 py-2 text-sm font-medium transition-colors ${
+    isActive ? 'bg-mb-blue text-white' : 'text-gray-700 hover:bg-gray-100'
+  }`;
+
+// 관리 메뉴 (데스크톱 드롭다운) — 모델 관리 · 통계 · 코드 사전
+function AdminMenu({ isAdmin, canViewDict }) {
+  const { pathname } = useLocation();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const active = pathname.startsWith('/admin');
+
+  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className={`px-3 py-1.5 rounded text-sm font-medium transition-colors inline-flex items-center gap-1 ${
+          active ? 'bg-mb-blue text-white' : 'text-gray-600 hover:bg-gray-100'
+        }`}
+      >
+        관리
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
+          {isAdmin && <NavLink to="/admin/models" className={navCls}>모델 관리</NavLink>}
+          {isAdmin && <NavLink to="/admin/stats" className={navCls}>통계</NavLink>}
+          {canViewDict && <NavLink to="/admin/dict" className={navCls}>코드 사전</NavLink>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Layout({ children }) {
   const { profile, isAdmin, canViewDict, isBootstrap, isAgent, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const showAdminMenu = isAdmin || canViewDict;
   const manualUrl = MANUAL_BY_ROLE[profile?.role] || '/manuals/manual-staff-b-sales.html';
 
   async function handleSignOut() {
@@ -81,48 +127,7 @@ export default function Layout({ children }) {
               >
                 색상코드
               </NavLink>
-              {isAdmin && (
-                <NavLink
-                  to="/admin/models"
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-mb-blue text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`
-                  }
-                >
-                  모델 관리
-                </NavLink>
-              )}
-              {canViewDict && (
-                <NavLink
-                  to="/admin/dict"
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-mb-blue text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`
-                  }
-                >
-                  코드 사전
-                </NavLink>
-              )}
-              {isAdmin && (
-                <NavLink
-                  to="/admin/stats"
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-mb-blue text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`
-                  }
-                >
-                  통계
-                </NavLink>
-              )}
+              {showAdminMenu && <AdminMenu isAdmin={isAdmin} canViewDict={canViewDict} />}
               <a
                 href={manualUrl}
                 target="_blank"
@@ -208,50 +213,28 @@ export default function Layout({ children }) {
               >
                 색상코드
               </NavLink>
-              {isAdmin && (
-                <NavLink
-                  to="/admin/models"
-                  onClick={() => setMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-mb-blue text-white'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`
-                  }
-                >
-                  모델 관리
-                </NavLink>
-              )}
-              {canViewDict && (
-                <NavLink
-                  to="/admin/dict"
-                  onClick={() => setMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-mb-blue text-white'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`
-                  }
-                >
-                  코드 사전
-                </NavLink>
-              )}
-              {isAdmin && (
-                <NavLink
-                  to="/admin/stats"
-                  onClick={() => setMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-mb-blue text-white'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`
-                  }
-                >
-                  통계
-                </NavLink>
+              {showAdminMenu && (
+                <div className="pt-1">
+                  <p className="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400">관리</p>
+                  {[
+                    isAdmin && { to: '/admin/models', label: '모델 관리' },
+                    isAdmin && { to: '/admin/stats', label: '통계' },
+                    canViewDict && { to: '/admin/dict', label: '코드 사전' },
+                  ].filter(Boolean).map((it) => (
+                    <NavLink
+                      key={it.to}
+                      to={it.to}
+                      onClick={() => setMenuOpen(false)}
+                      className={({ isActive }) =>
+                        `block pl-6 pr-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                          isActive ? 'bg-mb-blue text-white' : 'text-gray-700 hover:bg-gray-100'
+                        }`
+                      }
+                    >
+                      {it.label}
+                    </NavLink>
+                  ))}
+                </div>
               )}
               <a
                 href={manualUrl}
