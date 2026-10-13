@@ -40,9 +40,13 @@ export function parseQuotationFilename(name) {
   const base = String(name).replace(/\.docx$/i, '');
   const out = {};
 
-  // 시리즈 (Actros / Arocs / Atego) — "Actros-L" 등 변형 포함
-  const sm = base.match(/\b(Actros|Arocs|Atego)\b/i);
-  if (sm) out.series = sm[1][0].toUpperCase() + sm[1].slice(1).toLowerCase();
+  // 시리즈 (Actros / Arocs / Atego / eActros) — "Actros-L" 등 변형 포함
+  const sm = base.match(/\b(eActros|Actros|Arocs|Atego)\b/i);
+  if (sm) {
+    out.series = /^eactros$/i.test(sm[1])
+      ? 'eActros'
+      : sm[1][0].toUpperCase() + sm[1].slice(1).toLowerCase();
+  }
 
   // 축 구성 (6x2, 8x4 ...)
   const am = base.match(/\b([1-9])\s*[xX]\s*([1-9])\b/);

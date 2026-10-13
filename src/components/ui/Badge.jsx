@@ -18,6 +18,7 @@ export default function Badge({ children, variant = 'default', className = '' })
     actros:    'bg-blue-50 text-blue-700 border border-blue-200',
     arocs:     'bg-orange-50 text-orange-700 border border-orange-200',
     atego:     'bg-green-50 text-green-700 border border-green-200',
+    eactros:   'bg-cyan-50 text-cyan-700 border border-cyan-200',
   };
 
   return (

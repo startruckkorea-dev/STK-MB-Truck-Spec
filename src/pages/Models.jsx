@@ -10,9 +10,9 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../hooks/useAuth';
 import { compareModels } from '../lib/modelSort';
 
-const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego'];
+const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego', 'eActros'];
 
-const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego' };
+const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego', eActros: 'eactros' };
 
 const BADGE_LABELS = {
   new: 'NEW',

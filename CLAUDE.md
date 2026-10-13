@@ -79,7 +79,7 @@
 
 ### 2. 모델 목록 페이지 (`/models`)
 - 등록된 모델 카드 그리드 표시 (MY별·차종별 그룹)
-- 필터: 연식(model_year), 시리즈(Actros / Arocs / Atego)
+- 필터: 연식(model_year), 시리즈(Actros / Arocs / Atego / eActros)
 - 검색: 모델 코드, 국문명 텍스트 검색
 - 각 카드에서 [사양 상세 보기] / [비교 추가] 가능
 - 비교 선택 시 하단 고정 바(compare bar) 표시, 최대 3개

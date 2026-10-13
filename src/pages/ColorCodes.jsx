@@ -8,7 +8,7 @@ import { useData } from '../contexts/DataContext';
 import { useSpecLang } from '../hooks/useSpecLang';
 import { normCode } from '../lib/codeIndex';
 
-const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego'];
+const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego', 'eActros'];
 
 // MY26 컬러코드는 "MB" + 숫자 4자리 (예: MB 6888)
 const COLOR_CODE_RE = /^MB\s*\d{4}$/i;

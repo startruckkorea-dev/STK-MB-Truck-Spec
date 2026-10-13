@@ -5,7 +5,7 @@ import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { useData } from '../../contexts/DataContext';
 
-const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego' };
+const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego', eActros: 'eactros' };
 
 const BADGE_LABELS = {
   new: 'NEW',

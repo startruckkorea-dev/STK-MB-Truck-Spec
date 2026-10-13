@@ -22,7 +22,7 @@ function fileNameFromUrl(url) {
   }
 }
 
-const SERIES_OPTIONS = ['Actros', 'Arocs', 'Atego'];
+const SERIES_OPTIONS = ['Actros', 'Arocs', 'Atego', 'eActros'];
 
 export default function AdminModelEdit() {
   const { id } = useParams(); // undefined = 신규 등록

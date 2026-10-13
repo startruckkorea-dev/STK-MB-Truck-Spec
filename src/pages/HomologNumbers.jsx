@@ -6,11 +6,11 @@ import { useData } from '../contexts/DataContext';
 import { useModels } from '../hooks/useModels';
 import { parseHomologNo, homologFileName } from '../lib/homologNo';
 
-const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego'];
+const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego', 'eActros'];
 // 차종(소분류) 정렬 우선순위 — 모델 목록과 동일
 const BODY_TYPE_ORDER = ['트랙터', '카고', '덤프', '믹서', '크레인'];
 
-const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego' };
+const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego', eActros: 'eactros' };
 
 const modelName = (m) => [m.series, m.code, m.axle, m.cabin].filter(Boolean).join(' ');
 
