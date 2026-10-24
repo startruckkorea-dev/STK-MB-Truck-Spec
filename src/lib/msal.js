@@ -97,6 +97,20 @@ function isStaleAuthError(err) {
 }
 
 /**
+ * 모바일(iOS/Android) 여부.
+ * 모바일 브라우저는 팝업을 새 탭으로 열고 원래 탭을 일시정지시켜, 팝업 탭에서 다시 로드된
+ * 앱이 `#code=...` 해시를 지운 뒤에야 원래 탭이 확인하게 된다 → hash_empty_error.
+ * 그래서 모바일은 팝업 대신 리다이렉트(현재 탭 전체 이동) 흐름을 쓴다.
+ */
+export function isMobileBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
+  // iPadOS 13+ 는 데스크톱(Mac) UA 를 쓰므로 터치 지원으로 판별
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+}
+
+/**
  * 현재 활성 로그인 경로.
  * 저장된 경로에 로그인 계정이 있으면 그것을, 없으면 계정이 있는 다른 경로를 쓴다.
  */
@@ -126,15 +140,23 @@ export function addAuthEventCallback(cb) {
 export async function initMsal() {
   if (initialized) return;
   await Promise.all(AUTH_APP_KEYS.map((k) => instances[k].initialize()));
-  // 리다이렉트 콜백 처리. 팝업 전용 흐름에서는 보통 no-op 이지만, stale 상태로
-  // hash_empty_error 등이 던져질 수 있어 무시한다 — 인스턴스 자체는 정상 사용 가능.
-  for (const key of AUTH_APP_KEYS) {
+  // 리다이렉트 콜백 처리 (모바일 리다이렉트 로그인 복귀 시 결과를 여기서 받는다).
+  // 로그인을 시작한 경로(저장된 앱)를 먼저 처리해야 다른 인스턴스가 해시를 먼저 건드리지 않는다.
+  // stale 상태로 hash_empty_error 등이 던져질 수 있어 무시한다 — 인스턴스 자체는 정상 사용 가능.
+  const stored = readStoredApp();
+  const order = [stored, ...AUTH_APP_KEYS.filter((k) => k !== stored)];
+  for (const key of order) {
+    let result = null;
     try {
-      await instances[key].handleRedirectPromise();
+      result = await instances[key].handleRedirectPromise();
     } catch (err) {
       if (!isStaleAuthError(err)) {
         console.warn('[msal] handleRedirectPromise:', err?.errorCode || err?.message);
       }
+    }
+    if (result?.account) {
+      instances[key].setActiveAccount(result.account);
+      continue;
     }
     const accounts = instances[key].getAllAccounts();
     if (accounts.length > 0) instances[key].setActiveAccount(accounts[0]);
@@ -162,6 +184,23 @@ export async function signInWithMicrosoft(appKey = DEFAULT_APP) {
     }
   }
   storeApp(key);
+  if (isMobileBrowser()) {
+    // 현재 탭이 Microsoft 로그인으로 이동했다가 돌아온다 → 결과는 initMsal() 에서 처리.
+    try {
+      await instance.loginRedirect(loginRequest);
+    } catch (err) {
+      if (!isStaleAuthError(err)) throw err;
+      console.warn('[msal] stale 인증 상태 감지 → 캐시 정리 후 재시도:', err.errorCode);
+      try {
+        await instance.clearCache();
+      } catch {
+        /* clearCache 실패는 무시 */
+      }
+      await instance.loginRedirect(loginRequest);
+    }
+    // 페이지가 이동하므로 이후 흐름은 진행하지 않는다.
+    return new Promise(() => {});
+  }
   try {
     const result = await instance.loginPopup(loginRequest);
     instance.setActiveAccount(result.account);
@@ -186,6 +225,10 @@ export async function signOutMicrosoft() {
   await initMsal();
   const instance = getMsalInstance();
   const account = instance.getActiveAccount();
+  if (isMobileBrowser()) {
+    await instance.logoutRedirect({ account, postLogoutRedirectUri: window.location.origin });
+    return;
+  }
   await instance.logoutPopup({ account });
 }
 
@@ -209,6 +252,11 @@ export async function getGraphToken(scopes = loginRequest.scopes) {
     return res.accessToken;
   } catch (err) {
     if (err instanceof InteractionRequiredAuthError) {
+      if (isMobileBrowser()) {
+        // 재인증 후 돌아오면 initMsal() 이 결과를 처리하고 앱이 다시 로드된다.
+        await instance.acquireTokenRedirect({ account, scopes });
+        return new Promise(() => {});
+      }
       const res = await instance.acquireTokenPopup({ account, scopes });
       return res.accessToken;
     }
