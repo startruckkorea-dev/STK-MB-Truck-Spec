@@ -22,6 +22,33 @@ const EMPTY = { codeDict: [], models: [], specs: [], modelNotes: [], notices: []
 const nextId = (arr) => arr.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) + 1;
 const sameId = (a, b) => Number(a) === Number(b);
 
+/**
+ * rows(시트 순서 배열)에서 modelId 소속 행들을 newList 로 교체하되, 기존 위치에 그대로 끼운다.
+ * 기존 행의 id 는 순서대로 재사용하고 부족분만 새 id 를 발급한다.
+ * → 시트에서 바뀌는 구간이 최소화되어 diff 쓰기가 짧아진다.
+ * (모델 소속 행이 없으면 맨 뒤에 추가)
+ */
+function replaceInPlace(rows, modelId, newList) {
+  const oldIds = rows.filter((x) => sameId(x.model_id, modelId)).map((x) => x.id);
+  let base = nextId(rows);
+  const block = newList.map((x, i) => ({
+    ...x,
+    id: i < oldIds.length ? oldIds[i] : base++,
+    model_id: modelId,
+  }));
+  const out = [];
+  let inserted = false;
+  for (const r of rows) {
+    if (sameId(r.model_id, modelId)) {
+      if (!inserted) { out.push(...block); inserted = true; }
+    } else {
+      out.push(r);
+    }
+  }
+  if (!inserted) out.push(...block);
+  return out;
+}
+
 export function DataProvider({ children }) {
   const { user } = useAuth();
   const [state, setState] = useState(EMPTY);
@@ -146,19 +173,15 @@ export function DataProvider({ children }) {
       ? [...s.models, modelRow]
       : s.models.map((m) => (sameId(m.id, modelId) ? modelRow : m));
 
-    const otherSpecs = s.specs.filter((x) => !sameId(x.model_id, modelId));
-    const specBase = nextId(s.specs);
-    const newModelSpecs = specsList.map((x, i) => ({ ...x, id: specBase + i, model_id: modelId }));
-    const newSpecs = [...otherSpecs, ...newModelSpecs];
+    const newSpecs = replaceInPlace(s.specs, modelId, specsList);
+    const newNotes = replaceInPlace(s.modelNotes, modelId, notesList);
 
-    const otherNotes = s.modelNotes.filter((x) => !sameId(x.model_id, modelId));
-    const noteBase = nextId(s.modelNotes);
-    const newModelNotes = notesList.map((x, i) => ({ ...x, id: noteBase + i, model_id: modelId }));
-    const newNotes = [...otherNotes, ...newModelNotes];
-
-    await wb.overwriteSheet('models', newModels);
-    await wb.overwriteSheet('specs', newSpecs);
-    await wb.overwriteSheet('model_notes', newNotes);
+    // 바뀐 행만 쓰고(diff), 한 워크북 세션으로 묶어 왕복 비용을 줄인다.
+    await wb.withSession(async () => {
+      await wb.overwriteSheet('models', newModels, s.models);
+      await wb.overwriteSheet('specs', newSpecs, s.specs);
+      await wb.overwriteSheet('model_notes', newNotes, s.modelNotes);
+    });
 
     setState((st) => ({ ...st, models: newModels, specs: newSpecs, modelNotes: newNotes }));
     return modelId;
@@ -169,16 +192,16 @@ export function DataProvider({ children }) {
     const newModels = s.models.filter((m) => !sameId(m.id, id));
     const newSpecs = s.specs.filter((x) => !sameId(x.model_id, id));
     const newNotes = s.modelNotes.filter((x) => !sameId(x.model_id, id));
-    await wb.overwriteSheet('models', newModels);
-    if (newSpecs.length !== s.specs.length) await wb.overwriteSheet('specs', newSpecs);
-    if (newNotes.length !== s.modelNotes.length) await wb.overwriteSheet('model_notes', newNotes);
+    await wb.overwriteSheet('models', newModels, s.models);
+    if (newSpecs.length !== s.specs.length) await wb.overwriteSheet('specs', newSpecs, s.specs);
+    if (newNotes.length !== s.modelNotes.length) await wb.overwriteSheet('model_notes', newNotes, s.modelNotes);
     setState((st) => ({ ...st, models: newModels, specs: newSpecs, modelNotes: newNotes }));
   }
 
   async function setModelVisible(id, visible) {
     const s = stateRef.current;
     const newModels = s.models.map((m) => (sameId(m.id, id) ? { ...m, is_visible: visible } : m));
-    await wb.overwriteSheet('models', newModels);
+    await wb.overwriteSheet('models', newModels, s.models);
     setState((st) => ({ ...st, models: newModels }));
   }
 
@@ -197,7 +220,7 @@ export function DataProvider({ children }) {
     if (ia < 0 || ib < 0 || ia === ib) return;
     [ordered[ia], ordered[ib]] = [ordered[ib], ordered[ia]];
     const renumbered = ordered.map((m, i) => ({ ...m, sort_order: i }));
-    await wb.overwriteSheet('models', renumbered);
+    await wb.overwriteSheet('models', renumbered, s.models);
     setState((st) => ({ ...st, models: renumbered }));
   }
 
@@ -222,7 +245,7 @@ export function DataProvider({ children }) {
     const result = [...ordered];
     ids.forEach((id, k) => { result[slots[k]] = byId.get(id); });
     const renumbered = result.map((m, i) => ({ ...m, sort_order: i }));
-    await wb.overwriteSheet('models', renumbered);
+    await wb.overwriteSheet('models', renumbered, s.models);
     setState((st) => ({ ...st, models: renumbered }));
   }
 

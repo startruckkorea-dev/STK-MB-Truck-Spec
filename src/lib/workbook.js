@@ -89,6 +89,40 @@ async function wbBase() {
   return `/sites/${siteId}/drive/items/${itemId}/workbook`;
 }
 
+// ─── 워크북 세션 ─────────────────────────────────────────────────────
+// 세션 없이 호출하면 Graph 가 요청마다 워크북을 새로 열어 느리다. 여러 쓰기를 묶을 때
+// withSession() 으로 감싸면 같은 세션(workbook-session-id)을 재사용한다.
+let _sessionId = null;
+
+/** 현재 세션이 있으면 헤더를 붙인 옵션 반환 */
+const sOpts = () => (_sessionId ? { headers: { 'workbook-session-id': _sessionId } } : undefined);
+
+/**
+ * fn 을 워크북 세션(persistChanges=true) 안에서 실행한다.
+ * 세션 생성에 실패하면 세션 없이 그대로 실행한다(기존 동작).
+ */
+export async function withSession(fn) {
+  if (_sessionId) return fn(); // 이미 세션 안
+  const base = await wbBase();
+  try {
+    const s = await graphPost(`${base}/createSession`, { persistChanges: true });
+    _sessionId = s?.id || null;
+  } catch (err) {
+    console.warn('[workbook] 세션 생성 실패 — 세션 없이 진행:', err.message);
+  }
+  const sid = _sessionId;
+  try {
+    return await fn();
+  } finally {
+    _sessionId = null;
+    if (sid) {
+      graphPost(`${base}/closeSession`, undefined, {
+        headers: { 'workbook-session-id': sid },
+      }).catch(() => {});
+    }
+  }
+}
+
 // ─── 값 변환 ─────────────────────────────────────────────────────────
 function colLetter(n) {
   let s = '';
@@ -218,25 +252,55 @@ export async function deleteRow(name, dataIndex) {
   );
 }
 
-/** 시트 데이터 전체를 objs 로 교체 (app 관리 시트: models/specs/model_notes/users) */
-export async function overwriteSheet(name, objs) {
+/**
+ * 시트 데이터 전체를 objs 로 교체 (app 관리 시트: models/specs/model_notes/users)
+ *
+ * prevObjs(메모리상 기존 데이터)를 주면 "바뀐 구간"만 쓴다:
+ *   - 앞쪽에서 처음 달라지는 행 ~ (길이가 같으면) 뒤쪽에서 마지막으로 달라지는 행
+ *   - 길이가 다르면 처음 달라지는 행부터 끝까지
+ * 단, 시트의 실제 행 수가 prevObjs 와 다르면(다른 사람이 변경) 안전하게 전체를 다시 쓴다.
+ */
+export async function overwriteSheet(name, objs, prevObjs = null) {
   const base = await wbBase();
   const lastCol = colLetter(SHEETS[name].columns.length);
+  const newVals = objs.map((o) => rowToValues(name, o));
+
+  // 변경 구간 계산 (prev 기준)
+  let from = 0;
+  let to = newVals.length; // exclusive
+  if (prevObjs) {
+    const key = (v) => JSON.stringify(v);
+    const oldKeys = prevObjs.map((o) => key(rowToValues(name, o)));
+    const newKeys = newVals.map(key);
+    while (from < newKeys.length && from < oldKeys.length && newKeys[from] === oldKeys[from]) from++;
+    if (newKeys.length === oldKeys.length) {
+      if (from === newKeys.length) return; // 변경 없음 → 아무 요청도 안 보냄
+      while (to > from && newKeys[to - 1] === oldKeys[to - 1]) to--;
+    }
+  }
 
   const ur = await graphGet(
-    `${base}/worksheets('${name}')/usedRange(valuesOnly=true)?$select=rowCount`
+    `${base}/worksheets('${name}')/usedRange(valuesOnly=true)?$select=rowCount`,
+    sOpts()
   );
   const oldRows = Math.max(0, (ur?.rowCount || 1) - 1);
 
-  // 새 데이터 쓰기 (대용량 대비 청크 분할)
+  // 메모리와 시트 행 수가 다르면 diff 를 믿을 수 없음 → 전체 쓰기
+  if (prevObjs && oldRows !== prevObjs.length) {
+    from = 0;
+    to = newVals.length;
+  }
+
+  // 변경 구간 쓰기 (대용량 대비 청크 분할)
   const CHUNK = 1000;
-  for (let i = 0; i < objs.length; i += CHUNK) {
-    const slice = objs.slice(i, i + CHUNK);
+  for (let i = from; i < to; i += CHUNK) {
+    const slice = newVals.slice(i, Math.min(i + CHUNK, to));
     const start = i + 2;
     const end = start + slice.length - 1;
     await graphPatch(
       `${base}/worksheets('${name}')/range(address='A${start}:${lastCol}${end}')`,
-      { values: slice.map((o) => rowToValues(name, o)) }
+      { values: slice },
+      sOpts()
     );
   }
 
@@ -246,7 +310,8 @@ export async function overwriteSheet(name, objs) {
     const delEnd = oldRows + 1;
     await graphPost(
       `${base}/worksheets('${name}')/range(address='A${delStart}:${lastCol}${delEnd}')/delete`,
-      { shift: 'Up' }
+      { shift: 'Up' },
+      sOpts()
     );
   }
 }
