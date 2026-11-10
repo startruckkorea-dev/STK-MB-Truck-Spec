@@ -6,6 +6,8 @@ import ModelGroupCard from '../components/ModelGroupCard';
 import CompareBar from '../components/CompareBar';
 import NoticeBoard from '../components/NoticeBoard';
 import Badge from '../components/ui/Badge';
+import Toggle from '../components/ui/Toggle';
+import StatusLight from '../components/StatusLight';
 import { useModels } from '../hooks/useModels';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../hooks/useAuth';
@@ -248,12 +250,22 @@ export default function Models() {
     setOverId(null);
   }
 
+  // 공개/숨김 전환 중인 모델 id (토글 연타 방지)
+  const [togglingIds, setTogglingIds] = useState(() => new Set());
+
   async function toggleVisibility(model) {
+    if (togglingIds.has(model.id)) return;
+    setTogglingIds((s) => new Set(s).add(model.id));
     try {
       await setModelVisible(model.id, !model.is_visible);
     } catch (e) {
       alert(e.message);
     }
+    setTogglingIds((s) => {
+      const next = new Set(s);
+      next.delete(model.id);
+      return next;
+    });
   }
 
   // 리스트 뷰의 테이블 박스 하나를 렌더 (rows = 이 박스에 들어갈 모델들).
@@ -287,10 +299,10 @@ export default function Models() {
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">배지</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">생산월</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">차량상태</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">비교</th>
                 {isAdmin && (
                   <>
-                    <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">상태</th>
                     <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">공개</th>
                     <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">순서</th>
                   </>
@@ -402,6 +414,11 @@ export default function Models() {
                         {model.production_month || <span className="text-gray-300">—</span>}
                       </div>
                     </td>
+                    <td className={`${cell} whitespace-nowrap`}>
+                      <div className={dim}>
+                        <StatusLight status={model.vehicle_status} />
+                      </div>
+                    </td>
                     <td className={`${cell} text-center whitespace-nowrap`}>
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleCompare(model); }}
@@ -416,24 +433,25 @@ export default function Models() {
                     </td>
                     {isAdmin && (
                       <>
-                        <td className={`${cell} text-center whitespace-nowrap`}>
-                          <span
-                            className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${
-                              model.is_visible
-                                ? 'bg-green-50 text-green-700'
-                                : 'bg-gray-100 text-gray-500'
-                            }`}
-                          >
-                            {model.is_visible ? '공개' : '숨김'}
-                          </span>
-                        </td>
-                        <td className={`${cell} text-center whitespace-nowrap`}>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleVisibility(model); }}
-                            className="px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                          >
-                            {model.is_visible ? '숨기기' : '공개하기'}
-                          </button>
+                        {/* 공개 상태 — 토글로 바로 공개/숨김 전환 */}
+                        <td
+                          className={`${cell} whitespace-nowrap cursor-default`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-center gap-1.5">
+                            <Toggle
+                              checked={!!model.is_visible}
+                              disabled={togglingIds.has(model.id)}
+                              onChange={() => toggleVisibility(model)}
+                            />
+                            <span
+                              className={`w-6 text-xs font-medium ${
+                                model.is_visible ? 'text-mb-blue' : 'text-gray-400'
+                              }`}
+                            >
+                              {model.is_visible ? '공개' : '숨김'}
+                            </span>
+                          </div>
                         </td>
                         <td className={`${cell} text-center whitespace-nowrap`}>
                           <span

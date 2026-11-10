@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import Badge from './ui/Badge';
+import StatusLight from './StatusLight';
 import { useAuth } from '../hooks/useAuth';
 import { useData } from '../contexts/DataContext';
 import { BADGE_LABELS, getYearVariant } from './ModelCard';
@@ -101,6 +102,7 @@ export default function ModelGroupCard({
                       {m.production_month}
                     </span>
                   )}
+                  {m.vehicle_status && <StatusLight status={m.vehicle_status} size="sm" />}
                   {isAdmin && !m.is_visible && (
                     <span className="px-1.5 py-0.5 text-[11px] bg-gray-200 text-gray-500 rounded font-medium">
                       숨김

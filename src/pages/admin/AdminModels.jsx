@@ -5,6 +5,7 @@ import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { useData } from '../../contexts/DataContext';
 import { compareModels } from '../../lib/modelSort';
+import { VEHICLE_STATUSES, normalizeStatus } from '../../lib/vehicleStatus';
 import { groupForMerge, computeMergeSpans, MODEL_MERGE_LEVELS } from '../../lib/mergeRows';
 
 // 모델 관리 표 병합 단계: MY → 차종분류 → 시리즈 → 모델코드 → 축 → 캐빈
@@ -37,6 +38,7 @@ export default function AdminModels() {
     loading,
     error,
     setModelVisible,
+    setModelStatus,
     deleteModel: ctxDeleteModel,
   } = useData();
   const [deleting, setDeleting] = useState(null);
@@ -68,6 +70,43 @@ export default function AdminModels() {
     } catch (e) {
       setActionError(e.message);
     }
+  }
+
+  // 차량 상태 드롭다운 변경 (저장 중인 모델 id 는 잠금)
+  const [statusSaving, setStatusSaving] = useState(null);
+  async function changeStatus(model, value) {
+    setActionError(null);
+    setStatusSaving(model.id);
+    try {
+      await setModelStatus(model.id, value);
+    } catch (e) {
+      setActionError(e.message);
+    }
+    setStatusSaving(null);
+  }
+
+  function renderStatusSelect(model) {
+    const cur = normalizeStatus(model.vehicle_status);
+    const green = cur === '출시';
+    return (
+      <select
+        value={cur}
+        disabled={statusSaving === model.id}
+        onChange={(e) => changeStatus(model, e.target.value)}
+        className={`text-xs font-medium border rounded-md pl-2 pr-6 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-mb-blue/30 disabled:opacity-50 ${
+          !cur
+            ? 'border-gray-200 text-gray-400'
+            : green
+              ? 'border-emerald-300 text-emerald-700'
+              : 'border-red-300 text-red-600'
+        }`}
+      >
+        <option value="">미지정</option>
+        {VEHICLE_STATUSES.map((s) => (
+          <option key={s.value} value={s.value}>{s.value}</option>
+        ))}
+      </select>
+    );
   }
 
   async function deleteModel(id) {
@@ -252,6 +291,7 @@ export default function AdminModels() {
                   <th className={tdHead}>기타특징</th>
                   <th className={tdHead}>배지</th>
                   <th className={`${tdHead} hidden lg:table-cell`}>생산월</th>
+                  <th className={tdHead}>차량상태</th>
                   <th className={thClass} onClick={() => handleSort('is_visible')}>
                     상태 <SortIcon col="is_visible" sortKey={sortKey} sortDir={sortDir} />
                   </th>
@@ -339,6 +379,9 @@ export default function AdminModels() {
                         </div>
                       </td>
                       <td className={`${cell} whitespace-nowrap`}>
+                        {renderStatusSelect(model)}
+                      </td>
+                      <td className={`${cell} whitespace-nowrap`}>
                         <span
                           className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
                             model.is_visible
@@ -384,7 +427,7 @@ export default function AdminModels() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="text-center py-12 text-gray-400 text-sm">
+                    <td colSpan={12} className="text-center py-12 text-gray-400 text-sm">
                       {activeFilters > 0
                         ? '필터 조건에 맞는 모델이 없습니다.'
                         : <>등록된 모델이 없습니다.{' '}
@@ -458,6 +501,10 @@ export default function AdminModels() {
                         </div>
                       )}
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-gray-500">차량상태</span>
+                    {renderStatusSelect(model)}
                   </div>
                   <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-100">
                     <button

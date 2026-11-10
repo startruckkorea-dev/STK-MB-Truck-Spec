@@ -158,13 +158,17 @@
 | 시트 | 컬럼 (순서대로) |
 |---|---|
 | `code_dict` | id, code, name_en, name_ko, category, hex_color, is_hidden |
-| `models` | id, series, code, axle, cabin, code_desc, name_ko, model_year, production_month, badge, is_visible, sort_order |
+| `models` | id, series, code, axle, cabin, code_desc, name_ko, model_year, production_month, badge, is_visible, sort_order, homolog_spec_url, homolog_view_url, vehicle_status |
 | `specs` | id, model_id, category, spec_key, spec_value, label_ko, use_translate, is_color, is_hidden, sort_order |
 | `model_notes` | id, model_id, label, content, sort_order |
 | `notices` | id, title, content, is_pinned, is_visible, author, created_at, updated_at, attachments, sort_order |
 
 > 역할 권한은 이 데이터 워크북이 아니라 별도의 `Access/Access_List_*.xlsx`(G=이메일, H=권한)로
 > 관리한다. ([src/lib/accessList.js](src/lib/accessList.js)) (과거 `users` 시트는 더 이상 역할에 쓰이지 않음)
+
+> `models.vehicle_status` = 차량 진행 상태 (`생산` / `선적·도착` / `인증` / `PDI` / `출시`, 빈칸=미지정).
+> 모델 목록에 신호등으로 표시(출시=초록, 그 외=빨강). admin 이 모델 관리 표의 드롭다운 또는
+> 모델 편집 화면에서 지정한다. ([src/lib/vehicleStatus.js](src/lib/vehicleStatus.js), [src/components/StatusLight.jsx](src/components/StatusLight.jsx))
 
 **관계:**
 - `specs.model_id`, `model_notes.model_id` → `models.id`

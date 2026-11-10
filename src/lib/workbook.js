@@ -27,7 +27,8 @@ export const SHEETS = {
   models: {
     // 인증 자료 링크(homolog_spec_url=제원표, homolog_view_url=외관사면도)는 sort_order 뒤에 추가.
     // 앱은 컬럼을 위치 기준으로 읽으므로 반드시 맨 뒤에 둔다(기존 컬럼 순서 유지).
-    columns: ['id', 'series', 'code', 'axle', 'cabin', 'code_desc', 'name_ko', 'model_year', 'production_month', 'badge', 'is_visible', 'sort_order', 'homolog_spec_url', 'homolog_view_url'],
+    // vehicle_status = 차량 진행 상태(생산/선적·도착/인증/PDI/출시) — O열.
+    columns: ['id', 'series', 'code', 'axle', 'cabin', 'code_desc', 'name_ko', 'model_year', 'production_month', 'badge', 'is_visible', 'sort_order', 'homolog_spec_url', 'homolog_view_url', 'vehicle_status'],
     types: { id: 'num', is_visible: 'bool', sort_order: 'num' },
   },
   specs: {
@@ -185,6 +186,31 @@ export async function ensureSheet(name) {
     { values: [cols] }
   );
   return true; // 새로 만듦
+}
+
+/**
+ * 스키마 맨 뒤에 나중에 추가된 컬럼의 1행 헤더가 비어 있으면 채운다.
+ * (기존 헤더는 건드리지 않음 — 빈 헤더 셀만 기록). 세션당 시트별 1회만 확인.
+ */
+const _headerChecked = new Set();
+export async function ensureHeader(name) {
+  if (_headerChecked.has(name)) return;
+  const base = await wbBase();
+  const cols = SHEETS[name].columns;
+  const r = await graphGet(
+    `${base}/worksheets('${name}')/range(address='A1:${colLetter(cols.length)}1')?$select=values`
+  );
+  const cur = r?.values?.[0] || [];
+  for (let i = 0; i < cols.length; i++) {
+    if (cur[i] === '' || cur[i] == null) {
+      const cell = `${colLetter(i + 1)}1`;
+      await graphPatch(
+        `${base}/worksheets('${name}')/range(address='${cell}')`,
+        { values: [[cols[i]]] }
+      );
+    }
+  }
+  _headerChecked.add(name);
 }
 
 /**

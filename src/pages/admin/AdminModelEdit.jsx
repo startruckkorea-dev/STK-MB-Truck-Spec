@@ -10,6 +10,8 @@ import { listHomologationFolder, HOMOLOGATION_ROOT_LABEL } from '../../lib/homol
 import { normCode, isKrCode, nextKrCode } from '../../lib/codeIndex';
 import { SPEC_CATEGORY_OPTIONS } from '../../lib/specCategories';
 import { useData } from '../../contexts/DataContext';
+import StatusLight from '../../components/StatusLight';
+import { VEHICLE_STATUSES, normalizeStatus } from '../../lib/vehicleStatus';
 
 // SharePoint webUrl 에서 표시용 파일명 추출 (마지막 경로 세그먼트, 쿼리 제거)
 function fileNameFromUrl(url) {
@@ -42,6 +44,7 @@ export default function AdminModelEdit() {
   const [modelYear, setModelYear] = useState('');
   const [productionMonth, setProductionMonth] = useState('');
   const [badge, setBadge] = useState('');
+  const [vehicleStatus, setVehicleStatus] = useState('');   // 차량 진행 상태
   const [isVisible, setIsVisible] = useState(true);
   // 인증 자료 SharePoint 공유 링크
   const [homologSpecUrl, setHomologSpecUrl] = useState('');   // 제원표
@@ -81,6 +84,7 @@ export default function AdminModelEdit() {
     setModelYear(m.model_year);
     setProductionMonth(m.production_month ?? '');
     setBadge(m.badge ?? '');
+    setVehicleStatus(normalizeStatus(m.vehicle_status));
     setIsVisible(m.is_visible !== false);
     setHomologSpecUrl(m.homolog_spec_url ?? '');
     setHomologViewUrl(m.homolog_view_url ?? '');
@@ -376,6 +380,7 @@ export default function AdminModelEdit() {
         model_year: modelYear,
         production_month: productionMonth?.trim() || null,
         badge: badge || null,
+        vehicle_status: vehicleStatus || null,
         is_visible: isVisible,
         homolog_spec_url: homologSpecUrl?.trim() || null,
         homolog_view_url: homologViewUrl?.trim() || null,
@@ -554,6 +559,24 @@ export default function AdminModelEdit() {
                 <option value="fleet-export">Fleet수출</option>
                 <option value="branch-order">Branch주문차</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">차량 상태</label>
+              <div className="flex items-center gap-3">
+                <select
+                  value={vehicleStatus}
+                  onChange={(e) => setVehicleStatus(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
+                >
+                  <option value="">미지정</option>
+                  {VEHICLE_STATUSES.map((s) => (
+                    <option key={s.value} value={s.value}>{s.value}</option>
+                  ))}
+                </select>
+                <StatusLight status={vehicleStatus} />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">모델 목록 신호등: 출시 = 초록, 그 외 단계 = 빨강</p>
             </div>
 
             <Toggle

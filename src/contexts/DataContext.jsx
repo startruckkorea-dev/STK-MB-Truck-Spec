@@ -178,6 +178,7 @@ export function DataProvider({ children }) {
 
     // 바뀐 행만 쓰고(diff), 한 워크북 세션으로 묶어 왕복 비용을 줄인다.
     await wb.withSession(async () => {
+      if (modelRow.vehicle_status) await wb.ensureHeader('models');
       await wb.overwriteSheet('models', newModels, s.models);
       await wb.overwriteSheet('specs', newSpecs, s.specs);
       await wb.overwriteSheet('model_notes', newNotes, s.modelNotes);
@@ -201,6 +202,16 @@ export function DataProvider({ children }) {
   async function setModelVisible(id, visible) {
     const s = stateRef.current;
     const newModels = s.models.map((m) => (sameId(m.id, id) ? { ...m, is_visible: visible } : m));
+    await wb.overwriteSheet('models', newModels, s.models);
+    setState((st) => ({ ...st, models: newModels }));
+  }
+
+  /** 차량 진행 상태(vehicle_status) 변경 — 빈 문자열이면 미지정 */
+  async function setModelStatus(id, status) {
+    const s = stateRef.current;
+    const value = status || null;
+    const newModels = s.models.map((m) => (sameId(m.id, id) ? { ...m, vehicle_status: value } : m));
+    await wb.ensureHeader('models'); // 새 컬럼(O열) 헤더가 비어 있으면 채움
     await wb.overwriteSheet('models', newModels, s.models);
     setState((st) => ({ ...st, models: newModels }));
   }
@@ -328,6 +339,7 @@ export function DataProvider({ children }) {
     saveModel,
     deleteModel,
     setModelVisible,
+    setModelStatus,
     moveModelOrder,
     reorderModels,
     setSpecHidden,

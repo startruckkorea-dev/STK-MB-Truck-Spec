@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import StatusLight from './StatusLight';
 import { useAuth } from '../hooks/useAuth';
 import { useData } from '../contexts/DataContext';
 
@@ -95,7 +96,8 @@ export default function ModelCard({
         </h3>
 
         {/* 기타 특징 — 항상 동일한 높이 유지 */}
-        <div className="min-h-[1rem] mb-3 sm:mb-4">
+        <div className="min-h-[1rem] mb-3 sm:mb-4 flex items-center gap-2 flex-wrap">
+          {model.vehicle_status && <StatusLight status={model.vehicle_status} size="sm" />}
           {model.code_desc && (
             <p className="text-xs text-gray-400 leading-snug">{model.code_desc}</p>
           )}
