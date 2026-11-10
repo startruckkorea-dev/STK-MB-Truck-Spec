@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Badge from '../components/ui/Badge';
+import ListFilters, { matchBodySeries } from '../components/ListFilters';
 import { useData } from '../contexts/DataContext';
 import { useModels } from '../hooks/useModels';
 import { parseHomologNo, homologFileName } from '../lib/homologNo';
 import { sortBodyTypes, groupForMerge, computeMergeSpans, modelLevels } from '../lib/mergeRows';
 
-const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego', 'eActros'];
 
 const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego', eActros: 'eactros' };
 
@@ -50,7 +50,8 @@ export default function HomologNumbers() {
   const { models, loading, error } = useModels();
   const { modelNotes } = useData();
   const navigate = useNavigate();
-  const [series, setSeries] = useState('전체');
+  const [bodyType, setBodyType] = useState('전체');
+  const [series, setSeries] = useState(''); // '' = 전체 시리즈
   const [selectedYear, setSelectedYear] = useState('');
   const [search, setSearch] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
@@ -78,7 +79,7 @@ export default function HomologNumbers() {
     const q = search.trim().toLowerCase();
     const yearMap = {};
     for (const model of models) {
-      if (series !== '전체' && model.series !== series) continue;
+      if (!matchBodySeries(model, bodyType, series)) continue;
       if (selectedYear && model.model_year !== selectedYear) continue;
       const no = parseHomologNo(model.homolog_spec_url);
       if (onlyMissing && no) continue;
@@ -100,54 +101,44 @@ export default function HomologNumbers() {
     return Object.entries(yearMap)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([year, typeMap]) => ({ year, types: sortBodyTypes(Object.entries(typeMap)) }));
-  }, [models, series, selectedYear, search, onlyMissing]);
+  }, [models, bodyType, series, selectedYear, search, onlyMissing]);
 
   return (
     <Layout>
-      <div className="mb-4">
-        <h1 className="font-noto font-bold text-lg sm:text-2xl text-gray-900">제원관리번호</h1>
-        <p className="text-xs sm:text-sm text-gray-400 mt-1">
-          모델에 연동된 제원표(PDF) 파일명에서 추출한 번호입니다.
-        </p>
-      </div>
+      {/* 헤더 — 제목 오른쪽에 필터 */}
+      <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex-shrink-0">
+          <h1 className="font-barlow font-bold text-xl sm:text-2xl text-gray-900 tracking-wide">
+            제원관리번호
+          </h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
+            제원표(PDF) 파일명에서 추출한 번호
+          </p>
+        </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-5">
-        {SERIES_TABS.map((s) => (
-          <button
-            key={s}
-            onClick={() => setSeries(s)}
-            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-              series === s ? 'bg-mb-blue text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-          className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-mb-blue"
+        <ListFilters
+          className="flex-1 min-w-0"
+          bodyType={bodyType}
+          setBodyType={setBodyType}
+          series={series}
+          setSeries={setSeries}
+          year={selectedYear}
+          setYear={setSelectedYear}
+          years={years}
+          search={search}
+          setSearch={setSearch}
+          searchPlaceholder="모델·번호 검색..."
         >
-          <option value="">전체 MY</option>
-          {years.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="모델·번호 검색"
-          className="ml-auto w-full sm:w-64 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
-        />
-        <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={onlyMissing}
-            onChange={(e) => setOnlyMissing(e.target.checked)}
-            className="accent-mb-blue"
-          />
-          번호 없는 모델만 ({missingCount})
-        </label>
+          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={onlyMissing}
+              onChange={(e) => setOnlyMissing(e.target.checked)}
+              className="accent-mb-blue"
+            />
+            번호 없는 모델만 ({missingCount})
+          </label>
+        </ListFilters>
       </div>
 
       {loading ? (

@@ -5,6 +5,7 @@ import ModelCard from '../components/ModelCard';
 import ModelGroupCard from '../components/ModelGroupCard';
 import CompareBar from '../components/CompareBar';
 import NoticeBoard from '../components/NoticeBoard';
+import ListFilters, { matchBodySeries } from '../components/ListFilters';
 import Badge from '../components/ui/Badge';
 import Toggle from '../components/ui/Toggle';
 import StatusLight from '../components/StatusLight';
@@ -14,7 +15,6 @@ import { useAuth } from '../hooks/useAuth';
 import { compareModels } from '../lib/modelSort';
 import { sortBodyTypes, groupForMerge, computeMergeSpans } from '../lib/mergeRows';
 
-const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego', 'eActros'];
 
 const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego', eActros: 'eactros' };
 
@@ -75,7 +75,11 @@ export default function Models() {
 
   // 목록으로 되돌아온 경우 이전에 보던 필터 상태를 복원한다
   const savedState = useRef(loadSavedState()).current;
-  const [activeSeries, setActiveSeries] = useState(savedState?.activeSeries ?? '전체');
+  const [bodyType, setBodyType] = useState(savedState?.bodyType ?? '전체');
+  // 시리즈 드롭다운 ('' = 전체). 예전 저장값 '전체' 는 '' 로 본다
+  const [activeSeries, setActiveSeries] = useState(
+    savedState?.activeSeries && savedState.activeSeries !== '전체' ? savedState.activeSeries : ''
+  );
   const [selectedYear, setSelectedYear] = useState(savedState?.selectedYear ?? '');
   const [search, setSearch] = useState(savedState?.search ?? '');
   const [compareList, setCompareList] = useState([]);
@@ -105,6 +109,7 @@ export default function Models() {
       sessionStorage.setItem(
         STATE_KEY,
         JSON.stringify({
+          bodyType,
           activeSeries,
           selectedYear,
           search,
@@ -150,7 +155,7 @@ export default function Models() {
   // 필터링
   const filtered = useMemo(() => {
     return models.filter((m) => {
-      if (activeSeries !== '전체' && m.series !== activeSeries) return false;
+      if (!matchBodySeries(m, bodyType, activeSeries)) return false;
       if (selectedYear && m.model_year !== selectedYear) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -162,7 +167,7 @@ export default function Models() {
       }
       return true;
     });
-  }, [models, activeSeries, selectedYear, search]);
+  }, [models, bodyType, activeSeries, selectedYear, search]);
 
   // MY별 → 차종별 그룹핑
   const grouped = useMemo(() => {
@@ -482,19 +487,33 @@ export default function Models() {
       {/* 공지사항 게시판 */}
       <NoticeBoard />
 
-      {/* 헤더 */}
-      <div className="mb-4 sm:mb-6 flex items-start justify-between gap-3">
-        <div>
+      {/* 헤더 — 제목 오른쪽에 필터, 맨 오른쪽에 타일/리스트 토글 */}
+      <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex-shrink-0">
           <h1 className="font-barlow font-bold text-xl sm:text-2xl text-gray-900 tracking-wide">
             모델 목록
           </h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-1">
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
             {filtered.length}개 모델
           </p>
         </div>
 
+        <ListFilters
+          className="flex-1 min-w-0"
+          bodyType={bodyType}
+          setBodyType={setBodyType}
+          series={activeSeries}
+          setSeries={setActiveSeries}
+          year={selectedYear}
+          setYear={setSelectedYear}
+          years={years}
+          search={search}
+          setSearch={setSearch}
+          searchPlaceholder="모델 검색..."
+        />
+
         {/* 타일 / 리스트 뷰 토글 */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0 ml-auto">
           {[
             { key: 'tile', label: '타일' },
             { key: 'list', label: '리스트' },
@@ -511,49 +530,6 @@ export default function Models() {
               {v.label}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* 필터 + 검색 */}
-      <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-row sm:gap-3 mb-4 sm:mb-6">
-        {/* 시리즈 탭 */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
-          {SERIES_TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveSeries(tab)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                activeSeries === tab
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-2 sm:gap-3">
-          {/* MY 드롭다운 */}
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mb-blue"
-          >
-            <option value="">전체 연식</option>
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-
-          {/* 검색 */}
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="모델 검색..."
-            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
-          />
         </div>
       </div>
 

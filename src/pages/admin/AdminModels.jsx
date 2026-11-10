@@ -5,6 +5,7 @@ import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { useData } from '../../contexts/DataContext';
 import { compareModels } from '../../lib/modelSort';
+import ListFilters, { matchBodySeries } from '../../components/ListFilters';
 import { VEHICLE_STATUSES, normalizeStatus } from '../../lib/vehicleStatus';
 import { groupForMerge, computeMergeSpans, MODEL_MERGE_LEVELS } from '../../lib/mergeRows';
 
@@ -45,6 +46,7 @@ export default function AdminModels() {
   const [actionError, setActionError] = useState(null);
 
   // 필터
+  const [filterBody, setFilterBody] = useState('전체');
   const [filterYear, setFilterYear] = useState('');
   const [filterSeries, setFilterSeries] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -131,16 +133,12 @@ export default function AdminModels() {
     () => [...new Set(models.map((m) => m.model_year))].sort((a, b) => b - a),
     [models]
   );
-  const seriesOptions = useMemo(
-    () => [...new Set(models.map((m) => m.series))].sort(),
-    [models]
-  );
 
   // 필터 + 정렬 적용
   const filtered = useMemo(() => {
     let list = [...models];
     if (filterYear) list = list.filter((m) => String(m.model_year) === filterYear);
-    if (filterSeries) list = list.filter((m) => m.series === filterSeries);
+    list = list.filter((m) => matchBodySeries(m, filterBody, filterSeries));
     if (filterStatus === 'visible') list = list.filter((m) => m.is_visible);
     if (filterStatus === 'hidden') list = list.filter((m) => !m.is_visible);
 
@@ -167,14 +165,15 @@ export default function AdminModels() {
       return 0;
     });
     return list;
-  }, [models, filterYear, filterSeries, filterStatus, sortKey, sortDir]);
+  }, [models, filterBody, filterYear, filterSeries, filterStatus, sortKey, sortDir]);
 
   // 연속된 행 중 같은 값(MY→차종→시리즈→코드→축→캐빈)을 세로 병합
   const spans = useMemo(() => computeMergeSpans(filtered, ADMIN_MERGE_LEVELS), [filtered]);
 
-  const activeFilters = [filterYear, filterSeries, filterStatus].filter(Boolean).length;
+  const activeFilters = [filterBody !== '전체' && filterBody, filterYear, filterSeries, filterStatus].filter(Boolean).length;
 
   function clearFilters() {
+    setFilterBody('전체');
     setFilterYear('');
     setFilterSeries('');
     setFilterStatus('');
@@ -186,78 +185,63 @@ export default function AdminModels() {
 
   return (
     <Layout>
-      <div className="flex items-center justify-between mb-4 sm:mb-5">
-        <div>
-          <h1 className="font-barlow font-bold text-lg sm:text-2xl text-gray-900 tracking-wide">
+      {/* 헤더 — 제목 오른쪽에 필터, 맨 오른쪽에 [모델 등록] */}
+      <div className="mb-4 sm:mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex-shrink-0">
+          <h1 className="font-barlow font-bold text-xl sm:text-2xl text-gray-900 tracking-wide">
             모델 관리
           </h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-1">
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
             {filtered.length !== models.length
               ? `${filtered.length} / ${models.length}개 모델`
               : `총 ${models.length}개 모델`}
           </p>
         </div>
-        <Link to="/admin/models/new">
+
+        <ListFilters
+          className="flex-1 min-w-0"
+          bodyType={filterBody}
+          setBodyType={setFilterBody}
+          series={filterSeries}
+          setSeries={setFilterSeries}
+          year={filterYear}
+          setYear={setFilterYear}
+          years={yearOptions}
+          yearLabel={(y) => `MY${String(y).slice(2)}`}
+        >
+          {/* 공개 상태 필터 */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-9 px-2 sm:px-3 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-mb-blue"
+          >
+            <option value="">공개 전체</option>
+            <option value="visible">공개</option>
+            <option value="hidden">숨김</option>
+          </select>
+
+          {sortKey !== 'default' && (
+            <button
+              onClick={() => { setSortKey('default'); setSortDir('desc'); }}
+              className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              기본 정렬(묶어보기)
+            </button>
+          )}
+
+          {activeFilters > 0 && (
+            <button
+              onClick={clearFilters}
+              className="text-xs text-red-400 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              필터 초기화 ({activeFilters})
+            </button>
+          )}
+        </ListFilters>
+
+        <Link to="/admin/models/new" className="flex-shrink-0 ml-auto">
           <Button className="text-xs sm:text-sm">+ 모델 등록</Button>
         </Link>
-      </div>
-
-      {/* 필터 바 */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {/* MY 필터 */}
-        <select
-          value={filterYear}
-          onChange={(e) => setFilterYear(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-mb-blue/30"
-        >
-          <option value="">MY 전체</option>
-          {yearOptions.map((y) => (
-            <option key={y} value={String(y)}>
-              MY{String(y).slice(2)}
-            </option>
-          ))}
-        </select>
-
-        {/* 시리즈 필터 */}
-        <select
-          value={filterSeries}
-          onChange={(e) => setFilterSeries(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-mb-blue/30"
-        >
-          <option value="">시리즈 전체</option>
-          {seriesOptions.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-
-        {/* 상태 필터 */}
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-mb-blue/30"
-        >
-          <option value="">상태 전체</option>
-          <option value="visible">공개</option>
-          <option value="hidden">숨김</option>
-        </select>
-
-        {sortKey !== 'default' && (
-          <button
-            onClick={() => { setSortKey('default'); setSortDir('desc'); }}
-            className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            기본 정렬(묶어보기)
-          </button>
-        )}
-
-        {activeFilters > 0 && (
-          <button
-            onClick={clearFilters}
-            className="text-xs text-red-400 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-          >
-            필터 초기화 ({activeFilters})
-          </button>
-        )}
       </div>
 
       {loading && (

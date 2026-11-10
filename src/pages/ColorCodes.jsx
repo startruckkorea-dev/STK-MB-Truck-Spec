@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Badge from '../components/ui/Badge';
 import ColorSwatch from '../components/ColorSwatch';
+import ListFilters, { matchBodySeries } from '../components/ListFilters';
 import { useModels } from '../hooks/useModels';
 import { useData } from '../contexts/DataContext';
 import { useSpecLang } from '../hooks/useSpecLang';
 import { normCode } from '../lib/codeIndex';
 import { groupForMerge, computeMergeSpans, modelLevels } from '../lib/mergeRows';
 
-const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego', 'eActros'];
 const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego', eActros: 'eactros' };
 
 // MY26 컬러코드는 "MB" + 숫자 4자리 (예: MB 6888)
@@ -36,7 +36,8 @@ export default function ColorCodes() {
   const [lang] = useSpecLang();
   const navigate = useNavigate();
 
-  const [activeSeries, setActiveSeries] = useState('전체');
+  const [bodyType, setBodyType] = useState('전체');
+  const [activeSeries, setActiveSeries] = useState(''); // '' = 전체 시리즈
   const [selectedYear, setSelectedYear] = useState('');
   const [search, setSearch] = useState('');
 
@@ -74,7 +75,7 @@ export default function ColorCodes() {
     for (const m of models) {
       const colors = colorsByModel[m.id];
       if (!colors?.length) continue;
-      if (activeSeries !== '전체' && m.series !== activeSeries) continue;
+      if (!matchBodySeries(m, bodyType, activeSeries)) continue;
       if (selectedYear && m.model_year !== selectedYear) continue;
 
       // 색상명(번역) 문자열
@@ -105,60 +106,36 @@ export default function ColorCodes() {
     return Object.entries(yearMap)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([year, items]) => ({ year, items }));
-  }, [models, colorsByModel, codeIndex, activeSeries, selectedYear, search, lang]);
+  }, [models, colorsByModel, codeIndex, bodyType, activeSeries, selectedYear, search, lang]);
 
   const totalModels = grouped.reduce((n, g) => n + g.items.length, 0);
 
   return (
     <Layout>
-      {/* 헤더 */}
-      <div className="mb-4 sm:mb-6">
-        <h1 className="font-barlow font-bold text-xl sm:text-2xl text-gray-900 tracking-wide">
-          색상코드
-        </h1>
-        <p className="text-gray-500 text-xs sm:text-sm mt-1">
-          모델별 외장 컬러 코드 · {totalModels}개 모델
-        </p>
-      </div>
-
-      {/* 필터 + 검색 */}
-      <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-row sm:gap-3 mb-4 sm:mb-6">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
-          {SERIES_TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveSeries(tab)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                activeSeries === tab
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+      {/* 헤더 — 제목 오른쪽에 필터 */}
+      <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex-shrink-0">
+          <h1 className="font-barlow font-bold text-xl sm:text-2xl text-gray-900 tracking-wide">
+            색상코드
+          </h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
+            모델별 외장 컬러 코드 · {totalModels}개 모델
+          </p>
         </div>
 
-        <div className="flex gap-2 sm:gap-3">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mb-blue"
-          >
-            <option value="">전체 연식</option>
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="모델·색상 검색..."
-            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
-          />
-        </div>
+        <ListFilters
+          className="flex-1 min-w-0"
+          bodyType={bodyType}
+          setBodyType={setBodyType}
+          series={activeSeries}
+          setSeries={setActiveSeries}
+          year={selectedYear}
+          setYear={setSelectedYear}
+          years={years}
+          search={search}
+          setSearch={setSearch}
+          searchPlaceholder="모델·색상 검색..."
+        />
       </div>
 
       {/* 상태 */}
