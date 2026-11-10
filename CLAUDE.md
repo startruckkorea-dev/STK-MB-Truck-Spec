@@ -192,6 +192,7 @@
 | [src/lib/activityLog.js](src/lib/activityLog.js) | 접속·다운로드 기록(SharePoint `Log` 폴더, 사용자별 JSON) 기록·조회 — 관리자 통계용 |
 | [src/lib/accessList.js](src/lib/accessList.js) | SharePoint `Access` 폴더 접근권한 엑셀(G=이메일, H=권한) 읽기 |
 | [src/lib/codeIndex.js](src/lib/codeIndex.js) | `code_dict` → 코드 인덱스, 사양값 번역 매칭 |
+| [src/lib/mergeRows.js](src/lib/mergeRows.js) | 표 세로 병합 공용 유틸 (차종분류→시리즈→모델코드→축→캐빈, 차종 순서 트랙터·카고·덤프). 모델 목록·색상코드·제원관리번호·모델 관리 표에서 사용 |
 | [src/contexts/DataContext.jsx](src/contexts/DataContext.jsx) | 로그인 후 데이터 4개 시트를 메모리에 1회 로드. 검색·필터·페이지네이션은 클라이언트에서 처리, 변경 시 Graph 로 즉시 반영 |
 | [src/hooks/useAuth.jsx](src/hooks/useAuth.jsx) | MSAL 인증 + `Access` 엑셀 기반 역할 |
 | [src/hooks/useDict.js](src/hooks/useDict.js), [src/hooks/useModels.js](src/hooks/useModels.js) | DataContext 캐시 기반 조회 훅 |

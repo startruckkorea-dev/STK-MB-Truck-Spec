@@ -4,6 +4,11 @@ import Layout from '../../components/Layout';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { useData } from '../../contexts/DataContext';
+import { compareModels } from '../../lib/modelSort';
+import { groupForMerge, computeMergeSpans, MODEL_MERGE_LEVELS } from '../../lib/mergeRows';
+
+// 모델 관리 표 병합 단계: MY → 차종분류 → 시리즈 → 모델코드 → 축 → 캐빈
+const ADMIN_MERGE_LEVELS = [(m) => String(m.model_year ?? ''), ...MODEL_MERGE_LEVELS];
 
 const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego', eActros: 'eactros' };
 
@@ -43,7 +48,8 @@ export default function AdminModels() {
   const [filterStatus, setFilterStatus] = useState('');
 
   // 정렬
-  const [sortKey, setSortKey] = useState('model_year');
+  // 'default' = MY 최신순 → 차종(트랙터·카고·덤프)·시리즈·코드별로 묶어 병합 표시
+  const [sortKey, setSortKey] = useState('default');
   const [sortDir, setSortDir] = useState('desc');
 
   // 캐시의 모델에 노트를 붙임
@@ -99,6 +105,19 @@ export default function AdminModels() {
     if (filterStatus === 'visible') list = list.filter((m) => m.is_visible);
     if (filterStatus === 'hidden') list = list.filter((m) => !m.is_visible);
 
+    if (sortKey === 'default') {
+      // MY 내림차순 → 같은 MY 안에서 차종·시리즈·코드·축·캐빈별로 묶음
+      const byYear = new Map();
+      [...list].sort(compareModels).forEach((m) => {
+        const y = String(m.model_year ?? '');
+        if (!byYear.has(y)) byYear.set(y, []);
+        byYear.get(y).push(m);
+      });
+      return [...byYear.entries()]
+        .sort(([a], [b]) => b.localeCompare(a))
+        .flatMap(([, arr]) => groupForMerge(arr));
+    }
+
     list.sort((a, b) => {
       let va = a[sortKey] ?? '';
       let vb = b[sortKey] ?? '';
@@ -111,6 +130,9 @@ export default function AdminModels() {
     return list;
   }, [models, filterYear, filterSeries, filterStatus, sortKey, sortDir]);
 
+  // 연속된 행 중 같은 값(MY→차종→시리즈→코드→축→캐빈)을 세로 병합
+  const spans = useMemo(() => computeMergeSpans(filtered, ADMIN_MERGE_LEVELS), [filtered]);
+
   const activeFilters = [filterYear, filterSeries, filterStatus].filter(Boolean).length;
 
   function clearFilters() {
@@ -120,7 +142,8 @@ export default function AdminModels() {
   }
 
   const thClass =
-    'text-left px-4 py-3 text-gray-500 font-medium cursor-pointer select-none hover:text-gray-800 whitespace-nowrap';
+    'text-left px-3 py-3 text-gray-500 font-medium cursor-pointer select-none hover:text-gray-800 whitespace-nowrap first:pl-4';
+  const tdHead = 'text-left px-3 py-3 text-gray-500 font-medium whitespace-nowrap';
 
   return (
     <Layout>
@@ -179,6 +202,15 @@ export default function AdminModels() {
           <option value="hidden">숨김</option>
         </select>
 
+        {sortKey !== 'default' && (
+          <button
+            onClick={() => { setSortKey('default'); setSortDir('desc'); }}
+            className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            기본 정렬(묶어보기)
+          </button>
+        )}
+
         {activeFilters > 0 && (
           <button
             onClick={clearFilters}
@@ -202,80 +234,111 @@ export default function AdminModels() {
         <>
           {/* 데스크톱 테이블 */}
           <div className="hidden sm:block bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className={thClass} onClick={() => handleSort('name_ko')}>
-                    모델 <SortIcon col="name_ko" sortKey={sortKey} sortDir={sortDir} />
-                  </th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">기타특징</th>
-                  <th className={thClass} onClick={() => handleSort('series')}>
-                    시리즈 <SortIcon col="series" sortKey={sortKey} sortDir={sortDir} />
-                  </th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">배지</th>
                   <th className={`${thClass} hidden md:table-cell`} onClick={() => handleSort('model_year')}>
                     MY <SortIcon col="model_year" sortKey={sortKey} sortDir={sortDir} />
                   </th>
+                  <th className={thClass} onClick={() => handleSort('name_ko')}>
+                    차종 <SortIcon col="name_ko" sortKey={sortKey} sortDir={sortDir} />
+                  </th>
+                  <th className={thClass} onClick={() => handleSort('series')}>
+                    시리즈 <SortIcon col="series" sortKey={sortKey} sortDir={sortDir} />
+                  </th>
+                  <th className={tdHead}>모델코드</th>
+                  <th className={tdHead}>축</th>
+                  <th className={tdHead}>캐빈</th>
+                  <th className={tdHead}>기타특징</th>
+                  <th className={tdHead}>배지</th>
+                  <th className={`${tdHead} hidden lg:table-cell`}>생산월</th>
                   <th className={thClass} onClick={() => handleSort('is_visible')}>
                     상태 <SortIcon col="is_visible" sortKey={sortKey} sortDir={sortDir} />
                   </th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">액션</th>
+                  <th className="text-right px-3 py-3 text-gray-500 font-medium">액션</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.map((model) => {
+              <tbody>
+                {filtered.map((model, i) => {
                   const sortedNotes = [...(model.model_notes ?? [])].sort(
                     (a, b) => a.sort_order - b.sort_order
                   );
+                  const lv = spans[i];
+                  const border =
+                    i === 0 ? '' : lv[0] > 0 || lv[1] > 0 ? 'border-t border-gray-200' : 'border-t border-gray-100';
+                  const dim = !model.is_visible ? 'opacity-60' : '';
+                  const cell = `px-3 py-3 ${border} group-hover:bg-gray-50 transition-colors`;
+                  // 병합 셀: 위쪽 정렬, 묶인 모델이 모두 숨김일 때만 흐리게
+                  const merged = (level, extra, content) => {
+                    const span = lv[level];
+                    if (!span) return null;
+                    const allHidden = filtered.slice(i, i + span).every((m) => !m.is_visible);
+                    return (
+                      <td
+                        rowSpan={span}
+                        className={`px-3 py-3 align-top whitespace-nowrap ${border} ${
+                          span > 1 ? '' : 'group-hover:bg-gray-50'
+                        } ${extra}`}
+                      >
+                        <div className={allHidden ? 'opacity-60' : ''}>{content}</div>
+                      </td>
+                    );
+                  };
                   return (
-                    <tr
-                      key={model.id}
-                      className={`hover:bg-gray-50 transition-colors ${!model.is_visible ? 'opacity-60' : ''}`}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{model.name_ko}</div>
-                        <div className="font-mono text-xs text-gray-400">
-                          {model.code}{model.axle ? ` ${model.axle}` : ''}{model.cabin ? ` ${model.cabin}` : ''}
-                        </div>
-                        {model.code_desc && (
-                          <div className="text-xs text-gray-400 mt-0.5">{model.code_desc}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {sortedNotes.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {sortedNotes.map((n) => (
-                              <span
-                                key={n.id}
-                                className="inline-block text-xs bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded"
-                              >
-                                {n.label}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>{model.series}</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        {model.badge ? (
-                          <Badge variant={model.badge}>
-                            {BADGE_LABELS[model.badge] ?? model.badge}
-                          </Badge>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
+                    <tr key={model.id} className="group">
+                      {merged(0, 'hidden md:table-cell !pl-4', (
                         <span className="font-mono text-xs text-mb-blue font-semibold">{model.model_year}</span>
-                        {model.production_month && (
-                          <div className="font-mono text-[10px] text-gray-400 mt-0.5">{model.production_month}</div>
-                        )}
+                      ))}
+                      {merged(1, '', model.name_ko ? (
+                        <Badge variant="default">{model.name_ko}</Badge>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      ))}
+                      {merged(2, '', (
+                        <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>{model.series}</Badge>
+                      ))}
+                      {merged(3, 'font-mono text-sm font-semibold text-gray-900', model.code)}
+                      {merged(4, 'font-mono text-sm text-gray-500',
+                        model.axle || <span className="text-gray-300">—</span>)}
+                      {merged(5, 'font-mono text-sm text-gray-500',
+                        model.cabin || <span className="text-gray-300">—</span>)}
+                      <td className={cell}>
+                        <div className={dim}>
+                          {sortedNotes.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {sortedNotes.map((n) => (
+                                <span
+                                  key={n.id}
+                                  className="inline-block text-xs bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded"
+                                >
+                                  {n.label}
+                                </span>
+                              ))}
+                            </div>
+                          ) : model.code_desc ? (
+                            <span className="text-xs text-gray-500">{model.code_desc}</span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className={`${cell} whitespace-nowrap`}>
+                        <div className={dim}>
+                          {model.badge ? (
+                            <Badge variant={model.badge}>
+                              {BADGE_LABELS[model.badge] ?? model.badge}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className={`${cell} hidden lg:table-cell font-mono text-xs text-gray-500 whitespace-nowrap`}>
+                        <div className={dim}>
+                          {model.production_month || <span className="text-gray-300">—</span>}
+                        </div>
+                      </td>
+                      <td className={`${cell} whitespace-nowrap`}>
                         <span
                           className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
                             model.is_visible
@@ -286,7 +349,7 @@ export default function AdminModels() {
                           {model.is_visible ? '공개' : '숨김'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className={`${cell} text-right whitespace-nowrap`}>
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => toggleVisibility(model)}
@@ -321,7 +384,7 @@ export default function AdminModels() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-12 text-gray-400 text-sm">
+                    <td colSpan={11} className="text-center py-12 text-gray-400 text-sm">
                       {activeFilters > 0
                         ? '필터 조건에 맞는 모델이 없습니다.'
                         : <>등록된 모델이 없습니다.{' '}

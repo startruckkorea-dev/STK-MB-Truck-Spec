@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Badge from '../components/ui/Badge';
 import { useData } from '../contexts/DataContext';
 import { useModels } from '../hooks/useModels';
 import { parseHomologNo, homologFileName } from '../lib/homologNo';
+import { sortBodyTypes, groupForMerge, computeMergeSpans, modelLevels } from '../lib/mergeRows';
 
 const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego', 'eActros'];
-// 차종(소분류) 정렬 우선순위 — 모델 목록과 동일
-const BODY_TYPE_ORDER = ['트랙터', '카고', '덤프'];
 
 const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego', eActros: 'eactros' };
 
@@ -25,20 +24,10 @@ function getYearHeaderStyle(modelYear) {
   return 'text-gray-600 bg-gray-100 border border-gray-300';
 }
 
-function sortBodyTypes(types) {
-  return types.sort(([a], [b]) => {
-    const ia = BODY_TYPE_ORDER.indexOf(a);
-    const ib = BODY_TYPE_ORDER.indexOf(b);
-    if (ia === -1 && ib === -1) return a.localeCompare(b);
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
-    return ia - ib;
-  });
-}
-
 function CopyButton({ text }) {
   const [done, setDone] = useState(false);
-  async function copy() {
+  async function copy(e) {
+    e.stopPropagation();
     try {
       await navigator.clipboard.writeText(text);
       setDone(true);
@@ -60,6 +49,7 @@ function CopyButton({ text }) {
 export default function HomologNumbers() {
   const { models, loading, error } = useModels();
   const { modelNotes } = useData();
+  const navigate = useNavigate();
   const [series, setSeries] = useState('전체');
   const [selectedYear, setSelectedYear] = useState('');
   const [search, setSearch] = useState('');
@@ -178,10 +168,10 @@ export default function HomologNumbers() {
             </div>
 
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50 text-left text-gray-500">
-                    <th className="px-3 py-2.5 font-medium whitespace-nowrap">차종분류</th>
+                    <th className="pl-4 pr-3 py-2.5 font-medium whitespace-nowrap">차종분류</th>
                     <th className="px-3 py-2.5 font-medium whitespace-nowrap">시리즈</th>
                     <th className="px-3 py-2.5 font-medium whitespace-nowrap">모델코드</th>
                     <th className="px-3 py-2.5 font-medium whitespace-nowrap">축</th>
@@ -192,92 +182,117 @@ export default function HomologNumbers() {
                     <th className="px-3 py-2.5 font-medium whitespace-nowrap">도면파일</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {types.flatMap(([, items]) => items).map(({ model, no, file }) => {
-                    const notes = notesByModel[model.id] ?? [];
-                    return (
-                      <tr key={model.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-3 py-2.5 whitespace-nowrap">
-                          {model.name_ko ? (
+                <tbody>
+                  {(() => {
+                    const rows = groupForMerge(types.flatMap(([, items]) => items), (it) => it.model);
+                    const spans = computeMergeSpans(rows, modelLevels((r) => r.model));
+                    return rows.map(({ model, no, file }, i) => {
+                      const notes = notesByModel[model.id] ?? [];
+                      const lv = spans[i];
+                      const border =
+                        i === 0 ? '' : lv[0] > 0 ? 'border-t border-gray-200' : 'border-t border-gray-100';
+                      const cell = `px-3 py-2.5 ${border} group-hover:bg-gray-50 transition-colors`;
+                      // 병합 셀 — 여러 모델을 묶은 셀은 클릭해도 상세로 이동하지 않는다
+                      const merged = (level, extra, content) => {
+                        const span = lv[level];
+                        if (!span) return null;
+                        return (
+                          <td
+                            rowSpan={span}
+                            onClick={span > 1 ? (e) => e.stopPropagation() : undefined}
+                            className={`px-3 py-2.5 align-top whitespace-nowrap ${border} ${
+                              span > 1 ? 'cursor-default' : 'group-hover:bg-gray-50'
+                            } ${extra}`}
+                          >
+                            {content}
+                          </td>
+                        );
+                      };
+                      const stop = (e) => e.stopPropagation();
+                      return (
+                        <tr
+                          key={model.id}
+                          onClick={() => navigate(`/models/${model.id}`)}
+                          className="group cursor-pointer"
+                        >
+                          {merged(0, '!pl-4', model.name_ko ? (
                             <Badge variant="default">{model.name_ko}</Badge>
                           ) : (
                             <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap">
-                          <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>{model.series}</Badge>
-                        </td>
-                        <td className="px-3 py-2.5 font-mono text-sm text-gray-800 whitespace-nowrap">
-                          <Link to={`/models/${model.id}`} className="hover:text-mb-blue">{model.code}</Link>
-                        </td>
-                        <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
-                          {model.axle || <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
-                          {model.cabin || <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {notes.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {notes.map((n) => (
-                                <span
-                                  key={n.id}
-                                  className="inline-block text-xs bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded"
-                                >
-                                  {n.label}
-                                </span>
-                              ))}
-                            </div>
-                          ) : model.code_desc ? (
-                            <span className="text-xs text-gray-400">{model.code_desc}</span>
-                          ) : (
-                            <span className="text-gray-300 text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap font-mono text-sm">
-                          {no ? (
-                            <>
-                              {no}
-                              <CopyButton text={no} />
-                            </>
-                          ) : (
-                            <span className="text-gray-300 text-xs">
-                              {model.homolog_spec_url ? '번호 인식 불가' : '제원표 미연동'}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 text-xs whitespace-nowrap">
-                          {model.homolog_spec_url ? (
-                            <a
-                              href={model.homolog_spec_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-mb-blue hover:underline"
-                              title={file}
-                            >
-                              📄 열기
-                            </a>
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 text-xs whitespace-nowrap">
-                          {model.homolog_view_url ? (
-                            <a
-                              href={model.homolog_view_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-mb-blue hover:underline"
-                                                          >
-                              📐 열기
-                            </a>
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          ))}
+                          {merged(1, '', (
+                            <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>{model.series}</Badge>
+                          ))}
+                          {merged(2, 'font-mono text-sm font-semibold text-gray-900', model.code)}
+                          {merged(3, 'font-mono text-sm text-gray-500',
+                            model.axle || <span className="text-gray-300">—</span>)}
+                          {merged(4, 'font-mono text-sm text-gray-500',
+                            model.cabin || <span className="text-gray-300">—</span>)}
+                          <td className={cell}>
+                            {notes.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {notes.map((n) => (
+                                  <span
+                                    key={n.id}
+                                    className="inline-block text-xs bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded"
+                                  >
+                                    {n.label}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : model.code_desc ? (
+                              <span className="text-xs text-gray-500">{model.code_desc}</span>
+                            ) : (
+                              <span className="text-gray-300 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className={`${cell} whitespace-nowrap font-mono text-sm`}>
+                            {no ? (
+                              <>
+                                {no}
+                                <CopyButton text={no} />
+                              </>
+                            ) : (
+                              <span className="text-gray-300 text-xs">
+                                {model.homolog_spec_url ? '번호 인식 불가' : '제원표 미연동'}
+                              </span>
+                            )}
+                          </td>
+                          <td className={`${cell} text-xs whitespace-nowrap`}>
+                            {model.homolog_spec_url ? (
+                              <a
+                                href={model.homolog_spec_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={stop}
+                                className="text-mb-blue hover:underline"
+                                title={file}
+                              >
+                                📄 열기
+                              </a>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                          <td className={`${cell} text-xs whitespace-nowrap`}>
+                            {model.homolog_view_url ? (
+                              <a
+                                href={model.homolog_view_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={stop}
+                                className="text-mb-blue hover:underline"
+                              >
+                                📐 열기
+                              </a>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>

@@ -7,8 +7,10 @@ import { useModels } from '../hooks/useModels';
 import { useData } from '../contexts/DataContext';
 import { useSpecLang } from '../hooks/useSpecLang';
 import { normCode } from '../lib/codeIndex';
+import { groupForMerge, computeMergeSpans, modelLevels } from '../lib/mergeRows';
 
 const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego', 'eActros'];
+const SERIES_BADGE = { Actros: 'actros', Arocs: 'arocs', Atego: 'atego', eActros: 'eactros' };
 
 // MY26 컬러코드는 "MB" + 숫자 4자리 (예: MB 6888)
 const COLOR_CODE_RE = /^MB\s*\d{4}$/i;
@@ -189,69 +191,101 @@ export default function ColorCodes() {
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-                <table className="w-full text-sm table-fixed min-w-[640px]">
-                  {/* MY별 표 열 너비 통일 (차종·모델명·색상코드·색상명) */}
+                <table className="w-full text-sm table-fixed min-w-[820px] border-collapse">
+                  {/* MY별 표 열 너비 통일 */}
                   <colgroup>
-                    <col className="w-[14%]" />
-                    <col className="w-[34%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[7%]" />
                     <col className="w-[18%]" />
-                    <col className="w-[34%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[26%]" />
                   </colgroup>
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50 text-left text-gray-500">
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">차종</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">모델명</th>
+                      <th className="pl-4 pr-3 py-2.5 font-medium whitespace-nowrap">차종분류</th>
+                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">시리즈</th>
+                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">모델코드</th>
+                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">축</th>
+                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">캐빈</th>
+                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">색상코드</th>
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">색상명</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {items.map(({ model, rows }) =>
-                      rows.map((row, ri) => (
-                        <tr
-                          key={`${model.id}-${row.code}-${ri}`}
-                          onClick={() => navigate(`/models/${model.id}`)}
-                          className={`hover:bg-gray-50 transition-colors cursor-pointer ${ri === 0 ? 'border-t border-gray-100' : ''}`}
-                        >
-                          {/* 차종 + 모델명은 첫 색상 행에서 rowSpan 으로 병합 */}
-                          {ri === 0 && (
-                            <>
-                              <td
-                                rowSpan={rows.length}
-                                className="px-3 py-2.5 align-top whitespace-nowrap"
-                              >
+                  <tbody>
+                    {(() => {
+                      // 모델을 차종→시리즈→코드→축→캐빈 순으로 묶은 뒤 색상 행으로 펼친다
+                      const flat = groupForMerge(items, (it) => it.model).flatMap(({ model, rows }) =>
+                        rows.map((row, ri) => ({ model, row, ri }))
+                      );
+                      // 병합 단계: 모델 5단계 + 모델 자체(기타특징 칸)
+                      const spans = computeMergeSpans(flat, [
+                        ...modelLevels((r) => r.model),
+                        (r) => r.model.id,
+                      ]);
+                      return flat.map(({ model, row, ri }, i) => {
+                        const lv = spans[i];
+                        const border =
+                          i === 0 ? '' : lv[0] > 0 ? 'border-t border-gray-200' : 'border-t border-gray-100';
+                        // 병합 셀 — 한 모델만 묶은 셀이면 클릭 시 상세로, 여러 모델이면 이동 없음
+                        const merged = (level, extra, content) => {
+                          const span = lv[level];
+                          if (!span) return null;
+                          const single = flat.slice(i, i + span).every((r) => r.model.id === model.id);
+                          return (
+                            <td
+                              rowSpan={span}
+                              onClick={single ? undefined : (e) => e.stopPropagation()}
+                              className={`px-3 py-2.5 align-top ${border} ${
+                                single ? 'group-hover:bg-gray-50' : 'cursor-default'
+                              } ${extra}`}
+                            >
+                              {content}
+                            </td>
+                          );
+                        };
+                        const cell = `px-3 py-2.5 ${border} group-hover:bg-gray-50 transition-colors`;
+                        return (
+                          <tr
+                            key={`${model.id}-${row.code}-${ri}`}
+                            onClick={() => navigate(`/models/${model.id}`)}
+                            className="group cursor-pointer"
+                          >
+                            {merged(0, '!pl-4 whitespace-nowrap', (
+                              <>
                                 {model.name_ko ? (
                                   <Badge variant="default">{model.name_ko}</Badge>
                                 ) : (
                                   <span className="text-gray-300">—</span>
                                 )}
-                              </td>
-                              <td
-                                rowSpan={rows.length}
-                                className="px-3 py-2.5 align-top font-noto font-semibold text-gray-900 whitespace-nowrap"
-                              >
-                                {modelName(model)}
-                                {model.code_desc && (
-                                  <span className="block text-xs font-normal text-gray-400 mt-0.5">
-                                    {model.code_desc}
-                                  </span>
-                                )}
-                              </td>
-                            </>
-                          )}
-                          <td className="px-3 py-2.5 font-mono text-sm text-gray-800 whitespace-nowrap">
-                            {row.code}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            {row.hasEntry ? (
-                              <ColorSwatch hexColor={row.hex} nameKo={row.name || row.code} />
-                            ) : (
-                              <span className="text-amber-500 text-xs">번역 미등록</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                              </>
+                            ))}
+                            {merged(1, 'whitespace-nowrap', (
+                              <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>{model.series}</Badge>
+                            ))}
+                            {merged(2, 'font-mono text-sm font-semibold text-gray-900 whitespace-nowrap', model.code)}
+                            {merged(3, 'font-mono text-sm text-gray-500 whitespace-nowrap',
+                              model.axle || <span className="text-gray-300">—</span>)}
+                            {merged(4, 'font-mono text-sm text-gray-500 whitespace-nowrap',
+                              model.cabin || <span className="text-gray-300">—</span>)}
+                            {merged(5, 'text-xs text-gray-500', model.code_desc || <span className="text-gray-300">—</span>)}
+                            <td className={`${cell} font-mono text-sm text-gray-800 whitespace-nowrap`}>
+                              {row.code}
+                            </td>
+                            <td className={cell}>
+                              {row.hasEntry ? (
+                                <ColorSwatch hexColor={row.hex} nameKo={row.name || row.code} />
+                              ) : (
+                                <span className="text-amber-500 text-xs">번역 미등록</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>

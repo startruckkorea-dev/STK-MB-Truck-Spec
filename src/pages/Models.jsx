@@ -10,6 +10,7 @@ import { useModels } from '../hooks/useModels';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../hooks/useAuth';
 import { compareModels } from '../lib/modelSort';
+import { sortBodyTypes, groupForMerge, computeMergeSpans } from '../lib/mergeRows';
 
 const SERIES_TABS = ['전체', 'Actros', 'Arocs', 'Atego', 'eActros'];
 
@@ -40,9 +41,6 @@ function loadSavedState() {
   }
 }
 
-// 차종 정렬 우선순위
-const BODY_TYPE_ORDER = ['트랙터', '카고', '덤프'];
-
 function getYearHeaderStyle(modelYear) {
   const n = parseInt(String(modelYear).replace(/\D/g, '')) || 0;
   if (n >= 28) return 'text-amber-700 bg-amber-50 border border-amber-300';
@@ -51,45 +49,6 @@ function getYearHeaderStyle(modelYear) {
   if (n === 25) return 'text-teal-700 bg-teal-50 border border-teal-300';
   if (n === 24) return 'text-orange-700 bg-orange-50 border border-orange-300';
   return 'text-gray-600 bg-gray-100 border border-gray-300';
-}
-
-function sortBodyTypes(types) {
-  return types.sort(([a], [b]) => {
-    const ia = BODY_TYPE_ORDER.indexOf(a);
-    const ib = BODY_TYPE_ORDER.indexOf(b);
-    if (ia === -1 && ib === -1) return a.localeCompare(b);
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
-    return ia - ib;
-  });
-}
-
-// ── 리스트 뷰 셀 병합 ──
-// 병합 기준 컬럼 (앞 단계 값이 모두 같을 때만 다음 단계를 병합)
-const MERGE_LEVELS = [
-  (m) => m.name_ko || '',
-  (m) => m.series || '',
-  (m) => m.code || '',
-  (m) => m.axle || '',
-  (m) => m.cabin || '',
-];
-
-/**
- * 같은 값끼리 붙어 있도록 계층 정렬한다.
- * 차종은 BODY_TYPE_ORDER(트랙터→카고→덤프…) 순, 그 아래 단계는
- * 기존 표시 순서(sort_order)에서 처음 나타난 순서를 유지한다.
- */
-function groupForMerge(list, depth = 0) {
-  if (depth >= MERGE_LEVELS.length) return list;
-  const buckets = new Map();
-  list.forEach((m) => {
-    const k = MERGE_LEVELS[depth](m);
-    if (!buckets.has(k)) buckets.set(k, []);
-    buckets.get(k).push(m);
-  });
-  let entries = [...buckets.entries()];
-  if (depth === 0) entries = sortBodyTypes(entries);
-  return entries.flatMap(([, arr]) => groupForMerge(arr, depth + 1));
 }
 
 /**
@@ -104,25 +63,6 @@ function groupByCode(list) {
     else groups.push([m]);
   });
   return groups;
-}
-
-/**
- * 행별 병합 정보: levels[k] = 이 행에서 시작하는 k단계 병합 셀의 rowSpan
- * (0 이면 위 행의 병합 셀에 포함되므로 셀을 그리지 않는다).
- */
-function computeMergeSpans(rows) {
-  const prefix = rows.map((m) => {
-    let acc = '';
-    return MERGE_LEVELS.map((f) => (acc += '\u0001' + f(m)));
-  });
-  return rows.map((_, i) => ({
-    levels: MERGE_LEVELS.map((__, k) => {
-      if (i > 0 && prefix[i - 1][k] === prefix[i][k]) return 0;
-      let n = 1;
-      while (i + n < rows.length && prefix[i + n][k] === prefix[i][k]) n++;
-      return n;
-    }),
-  }));
 }
 
 export default function Models() {
@@ -363,7 +303,7 @@ export default function Models() {
                 const notes = [...(notesByModel[model.id] ?? [])].sort(
                   (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
                 );
-                const lv = spans[i].levels;
+                const lv = spans[i];
                 // 구분선: 차종이 바뀌는 행은 진하게, 그 외는 옅게
                 const border = (strong) =>
                   i === 0 ? '' : strong ? 'border-t border-gray-200' : 'border-t border-gray-100';
