@@ -11,6 +11,10 @@ import { normCode, isKrCode, nextKrCode } from '../../lib/codeIndex';
 import { SPEC_CATEGORY_OPTIONS } from '../../lib/specCategories';
 import { useData } from '../../contexts/DataContext';
 import StatusLight from '../../components/StatusLight';
+import { BODY_TYPE_ORDER } from '../../lib/mergeRows';
+
+// 차종분류 선택지 (트랙터·카고·덤프 + 기타)
+const BODY_TYPE_OPTIONS = [...BODY_TYPE_ORDER, '기타'];
 import { VEHICLE_STATUSES, normalizeStatus } from '../../lib/vehicleStatus';
 
 // SharePoint webUrl 에서 표시용 파일명 추출 (마지막 경로 세그먼트, 쿼리 제거)
@@ -515,12 +519,22 @@ export default function AdminModelEdit() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">차종분류 *</label>
-              <input
-                value={nameKo}
+              <select
+                value={nameKo || ''}
                 onChange={(e) => setNameKo(e.target.value)}
-                placeholder="예: 트랙터, 카고, 덤프"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
-              />
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mb-blue ${
+                  nameKo ? 'text-gray-900' : 'text-gray-400'
+                }`}
+              >
+                <option value="">선택하세요</option>
+                {BODY_TYPE_OPTIONS.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+                {/* 목록에 없는 기존 값은 그대로 보존해 표시 */}
+                {nameKo && !BODY_TYPE_OPTIONS.includes(nameKo) && (
+                  <option value={nameKo}>{nameKo} (기존 값)</option>
+                )}
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
