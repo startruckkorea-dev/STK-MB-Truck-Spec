@@ -299,7 +299,7 @@ export default function Models() {
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">배지</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">생산월</th>
-                <th className="px-3 py-2.5 font-medium whitespace-nowrap">차량상태</th>
+                <th className="px-3 py-2.5 font-medium whitespace-nowrap">출고준비단계</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">비교</th>
                 {isAdmin && (
                   <>

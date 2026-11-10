@@ -1,7 +1,7 @@
 import { normalizeStatus, isLaunched } from '../lib/vehicleStatus';
 
 /**
- * 차량 진행 상태 신호등 — 출시 = 초록, 그 외(생산·선적·도착·인증·PDI) = 빨강.
+ * 출고준비단계 신호등 — 출시 = 초록, 그 외(생산·선적·도착·인증·PDI) = 빨강.
  * 상태가 비어 있으면 회색 대시.
  * size: 'sm'(타일 카드 등) | 'md'(표)
  */
@@ -15,7 +15,7 @@ export default function StatusLight({ status, size = 'md', className = '' }) {
 
   return (
     <span
-      title={`차량 상태: ${s}`}
+      title={`출고준비단계: ${s}`}
       className={`inline-flex items-center gap-1.5 whitespace-nowrap font-medium ${text} ${
         green ? 'text-emerald-700' : 'text-red-600'
       } ${className}`}

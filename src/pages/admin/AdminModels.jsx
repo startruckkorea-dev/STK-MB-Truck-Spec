@@ -72,7 +72,7 @@ export default function AdminModels() {
     }
   }
 
-  // 차량 상태 드롭다운 변경 (저장 중인 모델 id 는 잠금)
+  // 출고준비단계 드롭다운 변경 (저장 중인 모델 id 는 잠금)
   const [statusSaving, setStatusSaving] = useState(null);
   async function changeStatus(model, value) {
     setActionError(null);
@@ -291,7 +291,7 @@ export default function AdminModels() {
                   <th className={tdHead}>기타특징</th>
                   <th className={tdHead}>배지</th>
                   <th className={`${tdHead} hidden lg:table-cell`}>생산월</th>
-                  <th className={tdHead}>차량상태</th>
+                  <th className={tdHead}>출고준비단계</th>
                   <th className={thClass} onClick={() => handleSort('is_visible')}>
                     상태 <SortIcon col="is_visible" sortKey={sortKey} sortDir={sortDir} />
                   </th>
@@ -503,7 +503,7 @@ export default function AdminModels() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs text-gray-500">차량상태</span>
+                    <span className="text-xs text-gray-500">출고준비단계</span>
                     {renderStatusSelect(model)}
                   </div>
                   <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-100">

@@ -1,5 +1,5 @@
 /**
- * vehicleStatus.js — 차량 진행 상태(생산 → 출시) 정의
+ * vehicleStatus.js — 출고준비단계(생산 → 출시) 정의
  *
  * `models` 시트의 `vehicle_status` 컬럼에 아래 value(국문)를 그대로 저장한다.
  * (Excel 에서 직접 편집해도 읽기 쉽도록 코드값 대신 국문 사용)

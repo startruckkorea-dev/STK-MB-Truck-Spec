@@ -166,7 +166,7 @@
 > 역할 권한은 이 데이터 워크북이 아니라 별도의 `Access/Access_List_*.xlsx`(G=이메일, H=권한)로
 > 관리한다. ([src/lib/accessList.js](src/lib/accessList.js)) (과거 `users` 시트는 더 이상 역할에 쓰이지 않음)
 
-> `models.vehicle_status` = 차량 진행 상태 (`생산` / `선적·도착` / `인증` / `PDI` / `출시`, 빈칸=미지정).
+> `models.vehicle_status` = 출고준비단계 (`생산` / `선적·도착` / `인증` / `PDI` / `출시`, 빈칸=미지정).
 > 모델 목록에 신호등으로 표시(출시=초록, 그 외=빨강). admin 이 모델 관리 표의 드롭다운 또는
 > 모델 편집 화면에서 지정한다. ([src/lib/vehicleStatus.js](src/lib/vehicleStatus.js), [src/components/StatusLight.jsx](src/components/StatusLight.jsx))
 

@@ -206,7 +206,7 @@ export function DataProvider({ children }) {
     setState((st) => ({ ...st, models: newModels }));
   }
 
-  /** 차량 진행 상태(vehicle_status) 변경 — 빈 문자열이면 미지정 */
+  /** 출고준비단계(vehicle_status) 변경 — 빈 문자열이면 미지정 */
   async function setModelStatus(id, status) {
     const s = stateRef.current;
     const value = status || null;

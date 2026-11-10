@@ -44,7 +44,7 @@ export default function AdminModelEdit() {
   const [modelYear, setModelYear] = useState('');
   const [productionMonth, setProductionMonth] = useState('');
   const [badge, setBadge] = useState('');
-  const [vehicleStatus, setVehicleStatus] = useState('');   // 차량 진행 상태
+  const [vehicleStatus, setVehicleStatus] = useState('');   // 출고준비단계
   const [isVisible, setIsVisible] = useState(true);
   // 인증 자료 SharePoint 공유 링크
   const [homologSpecUrl, setHomologSpecUrl] = useState('');   // 제원표
@@ -562,7 +562,7 @@ export default function AdminModelEdit() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">차량 상태</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">출고준비단계</label>
               <div className="flex items-center gap-3">
                 <select
                   value={vehicleStatus}
