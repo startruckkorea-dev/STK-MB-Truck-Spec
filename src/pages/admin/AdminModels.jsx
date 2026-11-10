@@ -307,7 +307,7 @@ export default function AdminModels() {
                   const border =
                     i === 0 ? '' : lv[0] > 0 || lv[1] > 0 ? 'border-t border-gray-200' : 'border-t border-gray-100';
                   const dim = !model.is_visible ? 'opacity-60' : '';
-                  const cell = `px-3 py-3 ${border} group-hover:bg-gray-50 transition-colors`;
+                  const cell = `px-3 py-3 align-top ${border} group-hover:bg-gray-50 transition-colors`;
                   // 병합 셀: 위쪽 정렬, 묶인 모델이 모두 숨김일 때만 흐리게
                   const merged = (level, extra, content) => {
                     const span = lv[level];
@@ -320,7 +320,7 @@ export default function AdminModels() {
                           span > 1 ? '' : 'group-hover:bg-gray-50'
                         } ${extra}`}
                       >
-                        <div className={allHidden ? 'opacity-60' : ''}>{content}</div>
+                        <div className={`cell-line ${allHidden ? 'opacity-60' : ''}`}>{content}</div>
                       </td>
                     );
                   };
@@ -343,7 +343,7 @@ export default function AdminModels() {
                       {merged(5, 'font-mono text-sm text-gray-500',
                         model.cabin || <span className="text-gray-300">—</span>)}
                       <td className={cell}>
-                        <div className={dim}>
+                        <div className={`cell-line ${dim}`}>
                           {sortedNotes.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {sortedNotes.map((n) => (
@@ -363,7 +363,7 @@ export default function AdminModels() {
                         </div>
                       </td>
                       <td className={`${cell} whitespace-nowrap`}>
-                        <div className={dim}>
+                        <div className={`cell-line ${dim}`}>
                           {model.badge ? (
                             <Badge variant={model.badge}>
                               {BADGE_LABELS[model.badge] ?? model.badge}
@@ -374,14 +374,15 @@ export default function AdminModels() {
                         </div>
                       </td>
                       <td className={`${cell} hidden lg:table-cell font-mono text-xs text-gray-500 whitespace-nowrap`}>
-                        <div className={dim}>
+                        <div className={`cell-line ${dim}`}>
                           {model.production_month || <span className="text-gray-300">—</span>}
                         </div>
                       </td>
                       <td className={`${cell} whitespace-nowrap`}>
-                        {renderStatusSelect(model)}
+                        <div className="cell-line">{renderStatusSelect(model)}</div>
                       </td>
                       <td className={`${cell} whitespace-nowrap`}>
+                        <div className="cell-line">
                         <span
                           className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
                             model.is_visible
@@ -391,9 +392,10 @@ export default function AdminModels() {
                         >
                           {model.is_visible ? '공개' : '숨김'}
                         </span>
+                        </div>
                       </td>
                       <td className={`${cell} text-right whitespace-nowrap`}>
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="cell-line !flex-row items-center justify-end gap-1">
                           <button
                             onClick={() => toggleVisibility(model)}
                             className="px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"

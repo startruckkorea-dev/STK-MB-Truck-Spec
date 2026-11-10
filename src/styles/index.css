@@ -22,6 +22,17 @@
   .slide-in-from-bottom-4 {
     animation: slideInFromBottom 0.25s ease-out;
   }
+
+  /* 표 셀 텍스트 라인 맞춤 — 모든 셀을 위쪽 정렬하고, 첫 줄을 배지 높이(30px)에
+     맞춘 상자 안에서 세로 가운데 정렬한다. 병합 셀·일반 셀·배지·텍스트가 같은 줄에 선다.
+     (모델 목록·제원관리번호·모델 관리 표) */
+  .cell-line {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 30px;
+  }
 }
 
 @keyframes slideIn {

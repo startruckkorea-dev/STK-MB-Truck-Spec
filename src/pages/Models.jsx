@@ -324,7 +324,7 @@ export default function Models() {
                 const dropMark = isDropTarget ? 'shadow-[inset_0_2px_0_#00ADEF]' : '';
                 const dim = !model.is_visible ? 'opacity-50' : '';
                 // 개별(병합되지 않는) 셀 공통 클래스
-                const cell = `px-3 py-2.5 ${rowBorder} ${dropMark} group-hover:bg-gray-50 transition-colors`;
+                const cell = `px-3 py-2.5 align-top ${rowBorder} ${dropMark} group-hover:bg-gray-50 transition-colors`;
 
                 // 병합 셀: 위쪽 정렬. 묶인 모델이 모두 숨김일 때만 흐리게.
                 // 여러 모델을 묶은 셀은 클릭해도 상세로 이동하지 않는다.
@@ -340,7 +340,7 @@ export default function Models() {
                         span > 1 ? 'cursor-default' : `group-hover:bg-gray-50 ${dropMark}`
                       } ${extra}`}
                     >
-                      <div className={allHidden ? 'opacity-50' : ''}>{content}</div>
+                      <div className={`cell-line ${allHidden ? 'opacity-50' : ''}`}>{content}</div>
                     </td>
                   );
                 };
@@ -379,7 +379,7 @@ export default function Models() {
                     {mergedCell(4, 'font-mono text-sm text-gray-500',
                       model.cabin || <span className="text-gray-300">—</span>)}
                     <td className={`${cell} whitespace-nowrap`}>
-                      <div className={dim}>
+                      <div className={`cell-line ${dim}`}>
                         {model.badge ? (
                           <Badge variant={model.badge}>
                             {BADGE_LABELS[model.badge] ?? model.badge}
@@ -390,7 +390,7 @@ export default function Models() {
                       </div>
                     </td>
                     <td className={cell}>
-                      <div className={dim}>
+                      <div className={`cell-line ${dim}`}>
                         {notes.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {notes.map((n) => (
@@ -410,16 +410,17 @@ export default function Models() {
                       </div>
                     </td>
                     <td className={`${cell} font-mono text-xs text-mb-blue font-semibold whitespace-nowrap`}>
-                      <div className={dim}>
+                      <div className={`cell-line ${dim}`}>
                         {model.production_month || <span className="text-gray-300">—</span>}
                       </div>
                     </td>
                     <td className={`${cell} whitespace-nowrap`}>
-                      <div className={dim}>
+                      <div className={`cell-line ${dim}`}>
                         <StatusLight status={model.vehicle_status} />
                       </div>
                     </td>
                     <td className={`${cell} text-center whitespace-nowrap`}>
+                      <div className="cell-line items-center">
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleCompare(model); }}
                         className={`px-2.5 py-1 text-xs rounded border transition-colors ${dim} ${
@@ -430,6 +431,7 @@ export default function Models() {
                       >
                         {isSelected ? '해제' : '비교'}
                       </button>
+                      </div>
                     </td>
                     {isAdmin && (
                       <>
@@ -438,7 +440,7 @@ export default function Models() {
                           className={`${cell} whitespace-nowrap cursor-default`}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="cell-line !flex-row items-center justify-center gap-1.5">
                             <Toggle
                               checked={!!model.is_visible}
                               disabled={togglingIds.has(model.id)}
@@ -454,12 +456,14 @@ export default function Models() {
                           </div>
                         </td>
                         <td className={`${cell} text-center whitespace-nowrap`}>
+                          <div className="cell-line items-center">
                           <span
                             title="드래그해서 순서 이동"
                             className={`inline-block text-gray-400 select-none ${reordering ? 'opacity-40' : 'cursor-grab hover:text-gray-700'}`}
                           >
                             ⠿
                           </span>
+                          </div>
                         </td>
                       </>
                     )}

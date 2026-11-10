@@ -191,7 +191,7 @@ export default function HomologNumbers() {
                       const lv = spans[i];
                       const border =
                         i === 0 ? '' : lv[0] > 0 ? 'border-t border-gray-200' : 'border-t border-gray-100';
-                      const cell = `px-3 py-2.5 ${border} group-hover:bg-gray-50 transition-colors`;
+                      const cell = `px-3 py-2.5 align-top ${border} group-hover:bg-gray-50 transition-colors`;
                       // 병합 셀 — 여러 모델을 묶은 셀은 클릭해도 상세로 이동하지 않는다
                       const merged = (level, extra, content) => {
                         const span = lv[level];
@@ -204,7 +204,7 @@ export default function HomologNumbers() {
                               span > 1 ? 'cursor-default' : 'group-hover:bg-gray-50'
                             } ${extra}`}
                           >
-                            {content}
+                            <div className="cell-line">{content}</div>
                           </td>
                         );
                       };
@@ -229,6 +229,7 @@ export default function HomologNumbers() {
                           {merged(4, 'font-mono text-sm text-gray-500',
                             model.cabin || <span className="text-gray-300">—</span>)}
                           <td className={cell}>
+                            <div className="cell-line">
                             {notes.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {notes.map((n) => (
@@ -245,8 +246,10 @@ export default function HomologNumbers() {
                             ) : (
                               <span className="text-gray-300 text-xs">—</span>
                             )}
+                            </div>
                           </td>
                           <td className={`${cell} whitespace-nowrap font-mono text-sm`}>
+                            <div className="cell-line !flex-row !justify-start items-center">
                             {no ? (
                               <>
                                 {no}
@@ -257,8 +260,10 @@ export default function HomologNumbers() {
                                 {model.homolog_spec_url ? '번호 인식 불가' : '제원표 미연동'}
                               </span>
                             )}
+                            </div>
                           </td>
                           <td className={`${cell} text-xs whitespace-nowrap`}>
+                            <div className="cell-line">
                             {model.homolog_spec_url ? (
                               <a
                                 href={model.homolog_spec_url}
@@ -273,8 +278,10 @@ export default function HomologNumbers() {
                             ) : (
                               <span className="text-gray-300">—</span>
                             )}
+                            </div>
                           </td>
                           <td className={`${cell} text-xs whitespace-nowrap`}>
+                            <div className="cell-line">
                             {model.homolog_view_url ? (
                               <a
                                 href={model.homolog_view_url}
@@ -288,6 +295,7 @@ export default function HomologNumbers() {
                             ) : (
                               <span className="text-gray-300">—</span>
                             )}
+                            </div>
                           </td>
                         </tr>
                       );
