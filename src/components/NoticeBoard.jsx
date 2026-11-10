@@ -40,6 +40,24 @@ function isRecent(v) {
 /** 한 페이지에 보여 줄 공지 수 — 나머지는 페이지를 넘겨서 본다 */
 const PAGE_SIZE = 5;
 
+/** 사이트 진입 후 고정글만 남기고 자동으로 접히기까지의 시간 */
+const AUTO_COLLAPSE_MS = 5000;
+/** 같은 탭(세션)에서 이미 한 번 접혔으면, 목록으로 돌아와도 바로 접힌 상태로 시작 */
+const COLLAPSED_KEY = 'notice-board-collapsed';
+
+function loadCollapsed() {
+  try {
+    return sessionStorage.getItem(COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function saveCollapsed(v) {
+  try {
+    sessionStorage.setItem(COLLAPSED_KEY, v ? '1' : '0');
+  } catch { /* 무시 */ }
+}
+
 export default function NoticeBoard() {
   const { notices, deleteNotice, setNoticePinned, setNoticeVisible } = useData();
   const { isAdmin } = useAuth();
@@ -68,6 +86,48 @@ export default function NoticeBoard() {
     if (page !== curPage) setPage(curPage);
   }, [page, curPage]);
 
+  // ── 자동 접기: 진입 5초 후 고정글만 남긴다 ──
+  // 세션에 접힘 기록이 있으면 처음부터 접힌 상태. 사용자가 직접 펼치거나 접으면
+  // 타이머는 취소되고 그 선택을 따른다. 마우스를 올려 둔 동안에는 접지 않는다.
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const userToggled = useRef(false);
+  const hovering = useRef(false);
+  const pendingCollapse = useRef(false);
+
+  function collapse() {
+    setCollapsed(true);
+    setPage(1);
+    saveCollapsed(true);
+  }
+
+  useEffect(() => {
+    if (collapsed) return undefined;
+    const t = setTimeout(() => {
+      if (userToggled.current) return;
+      if (hovering.current) {
+        pendingCollapse.current = true; // 마우스가 벗어날 때 접는다
+        return;
+      }
+      collapse();
+    }, AUTO_COLLAPSE_MS);
+    return () => clearTimeout(t);
+    // 최초 진입 시 한 번만
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function toggleCollapsed() {
+    userToggled.current = true;
+    pendingCollapse.current = false;
+    if (collapsed) {
+      setCollapsed(false);
+      saveCollapsed(false);
+    } else {
+      collapse();
+    }
+  }
+
+  const hiddenCount = list.filter((n) => !n.is_pinned).length;
+
   async function run(id, fn) {
     setBusyId(id);
     setErr('');
@@ -84,19 +144,44 @@ export default function NoticeBoard() {
   if (!list.length && !isAdmin) return null;
 
   return (
-    <section className="mb-4 sm:mb-6 border border-gray-200 rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+    <section
+      className="mb-4 sm:mb-6 border border-gray-200 rounded-xl overflow-hidden"
+      onMouseEnter={() => { hovering.current = true; }}
+      onMouseLeave={() => {
+        hovering.current = false;
+        if (pendingCollapse.current && !userToggled.current) {
+          pendingCollapse.current = false;
+          collapse();
+        }
+      }}
+    >
+      <div
+        className={`flex items-center justify-between gap-2 px-4 py-2.5 bg-gray-50 ${
+          collapsed && list.length > 0 && hiddenCount === list.length ? '' : 'border-b border-gray-200'
+        }`}
+      >
         <h2 className="font-barlow font-bold text-base sm:text-lg text-gray-900 tracking-wide flex items-center gap-2">
           <span aria-hidden="true">📢</span> 공지사항
         </h2>
-        {isAdmin && (
-          <button
-            onClick={() => setEditing({ notice: null })}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mb-blue text-white hover:bg-mb-blue-dark"
-          >
-            + 공지 작성
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {hiddenCount > 0 && (
+            <button
+              onClick={toggleCollapsed}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:bg-gray-200/60 hover:text-gray-800 transition-colors"
+              aria-expanded={!collapsed}
+            >
+              {collapsed ? `펼치기 ▾ (+${hiddenCount})` : '접기 ▴'}
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => setEditing({ notice: null })}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mb-blue text-white hover:bg-mb-blue-dark"
+            >
+              + 공지 작성
+            </button>
+          )}
+        </div>
       </div>
 
       {err && (
@@ -108,11 +193,21 @@ export default function NoticeBoard() {
           등록된 공지가 없습니다. [공지 작성]으로 첫 공지를 올려 보세요.
         </p>
       ) : (
-        <ul className="divide-y divide-gray-100">
-          {shown.map((n) => {
+        <ul>
+          {shown.map((n, idx) => {
             const atts = parseAttachments(n.attachments);
+            // 접힘 상태에서는 고정글만 남기고 나머지는 높이를 0 으로 줄여 숨긴다
+            const folded = collapsed && !n.is_pinned;
             return (
-              <li key={n.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50">
+              <li
+                key={n.id}
+                aria-hidden={folded || undefined}
+                className={`grid transition-[grid-template-rows,opacity] duration-500 ease-in-out ${
+                  folded ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
+                } ${idx > 0 && !folded ? 'border-t border-gray-100' : ''}`}
+              >
+              <div className="overflow-hidden min-h-0">
+              <div className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50">
                 <button
                   onClick={() => setOpenNotice(n)}
                   className="flex-1 min-w-0 text-left flex items-center gap-2"
@@ -175,13 +270,15 @@ export default function NoticeBoard() {
                     </button>
                   </span>
                 )}
+              </div>
+              </div>
               </li>
             );
           })}
         </ul>
       )}
 
-      {totalPages > 1 && (
+      {!collapsed && totalPages > 1 && (
         <Pager page={curPage} totalPages={totalPages} total={list.length} onChange={setPage} />
       )}
 
