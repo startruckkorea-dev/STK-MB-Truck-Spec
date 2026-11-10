@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import ModelCard from '../components/ModelCard';
+import ModelGroupCard from '../components/ModelGroupCard';
 import CompareBar from '../components/CompareBar';
 import NoticeBoard from '../components/NoticeBoard';
 import Badge from '../components/ui/Badge';
@@ -40,7 +41,7 @@ function loadSavedState() {
 }
 
 // 차종 정렬 우선순위
-const BODY_TYPE_ORDER = ['트랙터', '카고', '덤프', '믹서', '크레인'];
+const BODY_TYPE_ORDER = ['트랙터', '카고', '덤프'];
 
 function getYearHeaderStyle(modelYear) {
   const n = parseInt(String(modelYear).replace(/\D/g, '')) || 0;
@@ -61,6 +62,67 @@ function sortBodyTypes(types) {
     if (ib === -1) return -1;
     return ia - ib;
   });
+}
+
+// ── 리스트 뷰 셀 병합 ──
+// 병합 기준 컬럼 (앞 단계 값이 모두 같을 때만 다음 단계를 병합)
+const MERGE_LEVELS = [
+  (m) => m.name_ko || '',
+  (m) => m.series || '',
+  (m) => m.code || '',
+  (m) => m.axle || '',
+  (m) => m.cabin || '',
+];
+
+/**
+ * 같은 값끼리 붙어 있도록 계층 정렬한다.
+ * 차종은 BODY_TYPE_ORDER(트랙터→카고→덤프…) 순, 그 아래 단계는
+ * 기존 표시 순서(sort_order)에서 처음 나타난 순서를 유지한다.
+ */
+function groupForMerge(list, depth = 0) {
+  if (depth >= MERGE_LEVELS.length) return list;
+  const buckets = new Map();
+  list.forEach((m) => {
+    const k = MERGE_LEVELS[depth](m);
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k).push(m);
+  });
+  let entries = [...buckets.entries()];
+  if (depth === 0) entries = sortBodyTypes(entries);
+  return entries.flatMap(([, arr]) => groupForMerge(arr, depth + 1));
+}
+
+/**
+ * 타일 보기용 — 시리즈·모델코드가 같은 모델끼리 묶는다 (순서는 groupForMerge 기준).
+ * 반환: 모델 배열의 배열 (1개짜리는 기존 단일 카드로 표시).
+ */
+function groupByCode(list) {
+  const groups = [];
+  groupForMerge(list).forEach((m) => {
+    const last = groups[groups.length - 1];
+    if (last && last[0].series === m.series && last[0].code === m.code) last.push(m);
+    else groups.push([m]);
+  });
+  return groups;
+}
+
+/**
+ * 행별 병합 정보: levels[k] = 이 행에서 시작하는 k단계 병합 셀의 rowSpan
+ * (0 이면 위 행의 병합 셀에 포함되므로 셀을 그리지 않는다).
+ */
+function computeMergeSpans(rows) {
+  const prefix = rows.map((m) => {
+    let acc = '';
+    return MERGE_LEVELS.map((f) => (acc += '\u0001' + f(m)));
+  });
+  return rows.map((_, i) => ({
+    levels: MERGE_LEVELS.map((__, k) => {
+      if (i > 0 && prefix[i - 1][k] === prefix[i][k]) return 0;
+      let n = 1;
+      while (i + n < rows.length && prefix[i + n][k] === prefix[i][k]) n++;
+      return n;
+    }),
+  }));
 }
 
 export default function Models() {
@@ -256,8 +318,13 @@ export default function Models() {
 
   // 리스트 뷰의 테이블 박스 하나를 렌더 (rows = 이 박스에 들어갈 모델들).
   // label 이 있으면 박스 위에 소제목(Fleet / 주문차)을 붙인다.
+  // 차종분류 → 시리즈 → 모델코드 → 축 → 캐빈 순으로 같은 값을 세로 병합한다
+  // (배지·기타특징·생산월·비교 등은 모델별 개별 표시).
   function renderListTable(rows, label, keyBase) {
-    const groupIds = rows.map((r) => r.id);
+    const ordered = groupForMerge(rows);
+    const spans = computeMergeSpans(ordered);
+    const groupIds = ordered.map((r) => r.id);
+
     return (
       <div key={keyBase} className="mb-4 last:mb-0">
         {label && (
@@ -269,10 +336,10 @@ export default function Models() {
           </div>
         )}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-gray-500">
-                <th className="px-3 py-2.5 font-medium whitespace-nowrap">차종분류</th>
+                <th className="pl-4 pr-3 py-2.5 font-medium whitespace-nowrap">차종분류</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">시리즈</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">모델코드</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">축</th>
@@ -290,12 +357,42 @@ export default function Models() {
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((model) => {
+            <tbody>
+              {ordered.map((model, i) => {
                 const isSelected = compareList.some((m) => m.id === model.id);
                 const notes = [...(notesByModel[model.id] ?? [])].sort(
                   (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
                 );
+                const lv = spans[i].levels;
+                // 구분선: 차종이 바뀌는 행은 진하게, 그 외는 옅게
+                const border = (strong) =>
+                  i === 0 ? '' : strong ? 'border-t border-gray-200' : 'border-t border-gray-100';
+                const rowBorder = border(lv[0] > 0);
+                const isDropTarget = overId === model.id && dragId != null && dragId !== model.id;
+                const dropMark = isDropTarget ? 'shadow-[inset_0_2px_0_#00ADEF]' : '';
+                const dim = !model.is_visible ? 'opacity-50' : '';
+                // 개별(병합되지 않는) 셀 공통 클래스
+                const cell = `px-3 py-2.5 ${rowBorder} ${dropMark} group-hover:bg-gray-50 transition-colors`;
+
+                // 병합 셀: 위쪽 정렬. 묶인 모델이 모두 숨김일 때만 흐리게.
+                // 여러 모델을 묶은 셀은 클릭해도 상세로 이동하지 않는다.
+                const mergedCell = (level, extra, content) => {
+                  const span = lv[level];
+                  if (!span) return null;
+                  const allHidden = ordered.slice(i, i + span).every((m) => !m.is_visible);
+                  return (
+                    <td
+                      rowSpan={span}
+                      onClick={span > 1 ? (e) => e.stopPropagation() : undefined}
+                      className={`px-3 py-2.5 align-top whitespace-nowrap ${border(lv[0] > 0)} ${
+                        span > 1 ? 'cursor-default' : `group-hover:bg-gray-50 ${dropMark}`
+                      } ${extra}`}
+                    >
+                      <div className={allHidden ? 'opacity-50' : ''}>{content}</div>
+                    </td>
+                  );
+                };
+
                 return (
                   <tr
                     key={model.id}
@@ -305,68 +402,73 @@ export default function Models() {
                     onDragOver={(e) => handleDragOver(e, model.id)}
                     onDrop={(e) => { e.preventDefault(); handleDrop(model.id, groupIds); }}
                     onDragEnd={handleDragEnd}
-                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${!model.is_visible ? 'opacity-50' : ''} ${
-                      dragId === model.id ? 'opacity-40' : ''
-                    } ${overId === model.id && dragId != null && dragId !== model.id ? 'border-t-2 border-mb-blue' : ''}`}
+                    className={`group cursor-pointer ${dragId === model.id ? 'opacity-40' : ''}`}
                   >
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      {model.name_ko ? (
-                        <Badge variant="default">{model.name_ko}</Badge>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
+                    {mergedCell(0, '!pl-4', (
+                      <>
+                        {model.name_ko ? (
+                          <Badge variant="default">{model.name_ko}</Badge>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                        {lv[0] > 1 && (
+                          <div className="text-xs text-gray-400 mt-1.5 pl-0.5">{lv[0]}개</div>
+                        )}
+                      </>
+                    ))}
+                    {mergedCell(1, '', (
                       <Badge variant={SERIES_BADGE[model.series] ?? 'default'}>
                         {model.series}
                       </Badge>
+                    ))}
+                    {mergedCell(2, 'font-mono text-sm font-semibold text-gray-900', model.code)}
+                    {mergedCell(3, 'font-mono text-sm text-gray-500',
+                      model.axle || <span className="text-gray-300">—</span>)}
+                    {mergedCell(4, 'font-mono text-sm text-gray-500',
+                      model.cabin || <span className="text-gray-300">—</span>)}
+                    <td className={`${cell} whitespace-nowrap`}>
+                      <div className={dim}>
+                        {model.badge ? (
+                          <Badge variant={model.badge}>
+                            {BADGE_LABELS[model.badge] ?? model.badge}
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-sm text-gray-800 whitespace-nowrap">
-                      {model.code}
+                    <td className={cell}>
+                      <div className={dim}>
+                        {notes.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {notes.map((n) => (
+                              <span
+                                key={n.id}
+                                className="inline-block text-xs bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded"
+                              >
+                                {n.label}
+                              </span>
+                            ))}
+                          </div>
+                        ) : model.code_desc ? (
+                          <span className="text-xs text-gray-500">{model.code_desc}</span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
-                      {model.axle || <span className="text-gray-300">—</span>}
+                    <td className={`${cell} font-mono text-xs text-mb-blue font-semibold whitespace-nowrap`}>
+                      <div className={dim}>
+                        {model.production_month || <span className="text-gray-300">—</span>}
+                      </div>
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-sm text-gray-500 whitespace-nowrap">
-                      {model.cabin || <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      {model.badge ? (
-                        <Badge variant={model.badge}>
-                          {BADGE_LABELS[model.badge] ?? model.badge}
-                        </Badge>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {notes.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {notes.map((n) => (
-                            <span
-                              key={n.id}
-                              className="inline-block text-xs bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded"
-                            >
-                              {n.label}
-                            </span>
-                          ))}
-                        </div>
-                      ) : model.code_desc ? (
-                        <span className="text-xs text-gray-400">{model.code_desc}</span>
-                      ) : (
-                        <span className="text-gray-300 text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 font-mono text-xs text-mb-blue font-semibold whitespace-nowrap">
-                      {model.production_month || <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                    <td className={`${cell} text-center whitespace-nowrap`}>
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleCompare(model); }}
-                        className={`px-2.5 py-1 text-xs rounded border transition-colors ${
+                        className={`px-2.5 py-1 text-xs rounded border transition-colors ${dim} ${
                           isSelected
                             ? 'bg-mb-blue text-white border-mb-blue'
-                            : 'text-gray-600 border-gray-300 hover:bg-gray-100'
+                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'
                         }`}
                       >
                         {isSelected ? '해제' : '비교'}
@@ -374,7 +476,7 @@ export default function Models() {
                     </td>
                     {isAdmin && (
                       <>
-                        <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                        <td className={`${cell} text-center whitespace-nowrap`}>
                           <span
                             className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${
                               model.is_visible
@@ -385,7 +487,7 @@ export default function Models() {
                             {model.is_visible ? '공개' : '숨김'}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                        <td className={`${cell} text-center whitespace-nowrap`}>
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleVisibility(model); }}
                             className="px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -393,7 +495,7 @@ export default function Models() {
                             {model.is_visible ? '숨기기' : '공개하기'}
                           </button>
                         </td>
-                        <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                        <td className={`${cell} text-center whitespace-nowrap`}>
                           <span
                             title="드래그해서 순서 이동"
                             className={`inline-block text-gray-400 select-none ${reordering ? 'opacity-40' : 'cursor-grab hover:text-gray-700'}`}
@@ -535,8 +637,31 @@ export default function Models() {
                         <div className="flex-1 h-px bg-gray-100" />
                       </div>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                      {bodyModels.map((model) => (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 items-start">
+                      {groupByCode(bodyModels).map((codeModels) => {
+                        const groupIds = groupForMerge(bodyModels).map((m) => m.id);
+                        if (codeModels.length > 1) {
+                          return (
+                            <ModelGroupCard
+                              key={codeModels[0].id}
+                              models={codeModels}
+                              compareList={compareList}
+                              onCompareToggle={toggleCompare}
+                              notesByModel={notesByModel}
+                              reordering={reordering}
+                              draggable={isAdmin}
+                              dragId={dragId}
+                              overId={overId}
+                              onDragStart={handleDragStart}
+                              onDragOver={handleDragOver}
+                              onDrop={(e, id) => { e.preventDefault(); handleDrop(id, groupIds); }}
+                              onDragEnd={handleDragEnd}
+                              onNavigate={saveListState}
+                            />
+                          );
+                        }
+                        const model = codeModels[0];
+                        return (
                         <ModelCard
                           key={model.id}
                           model={model}
@@ -548,11 +673,12 @@ export default function Models() {
                           isDropTarget={overId === model.id && dragId != null && dragId !== model.id}
                           onDragStart={(e) => handleDragStart(e, model.id)}
                           onDragOver={(e) => handleDragOver(e, model.id)}
-                          onDrop={(e) => { e.preventDefault(); handleDrop(model.id, bodyModels.map((m) => m.id)); }}
+                          onDrop={(e) => { e.preventDefault(); handleDrop(model.id, groupIds); }}
                           onDragEnd={handleDragEnd}
                           onNavigate={saveListState}
                         />
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

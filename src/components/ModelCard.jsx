@@ -4,7 +4,7 @@ import Button from './ui/Button';
 import { useAuth } from '../hooks/useAuth';
 import { useData } from '../contexts/DataContext';
 
-const BADGE_LABELS = {
+export const BADGE_LABELS = {
   new: 'NEW',
   updated: 'UPDATED',
   'fleet-domestic': 'Fleet내수',
@@ -12,7 +12,7 @@ const BADGE_LABELS = {
   'branch-order': 'Branch주문차',
 };
 
-function getYearVariant(modelYear) {
+export function getYearVariant(modelYear) {
   const n = parseInt(String(modelYear).replace(/\D/g, '')) || 0;
   if (n >= 28) return 'year28';
   if (n === 27) return 'year27';
