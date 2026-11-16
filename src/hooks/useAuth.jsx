@@ -172,6 +172,8 @@ export function AuthProvider({ children }) {
   const canEditDict = isAdmin;
   // 모델 관리(등록/수정): admin 전용
   const canManageModels = isAdmin;
+  // 출고준비단계(vehicle_status) 열람: admin + 본사직원 A/B (sales·에이전트 불가)
+  const canViewStatus = isAdmin || isStaffA || isStaffB;
   const isBootstrap = accessStatus === 'bootstrap';
 
   return (
@@ -194,6 +196,7 @@ export function AuthProvider({ children }) {
         canViewDict,
         canEditDict,
         canManageModels,
+        canViewStatus,
         accessStatus,
         accessDenied,
         isBootstrap,

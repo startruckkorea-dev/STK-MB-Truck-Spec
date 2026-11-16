@@ -1,16 +1,16 @@
 /**
- * vehicleStatus.js — 출고준비단계(생산 → 출시) 정의
+ * vehicleStatus.js — 출고준비단계(생산 → 출고준비완료) 정의
  *
  * `models` 시트의 `vehicle_status` 컬럼에 아래 value(국문)를 그대로 저장한다.
  * (Excel 에서 직접 편집해도 읽기 쉽도록 코드값 대신 국문 사용)
- * 신호등 표시: 출시 = 초록, 그 외 단계 = 빨강.
+ * 신호등 표시: 출고준비완료 = 초록, 그 외 단계 = 빨강.
  */
 export const VEHICLE_STATUSES = [
   { value: '생산', en: 'Production' },
   { value: '선적·도착', en: 'Shipping' },
   { value: '인증', en: 'Homologation' },
   { value: 'PDI', en: 'PDI' },
-  { value: '출시', en: 'Launch' },
+  { value: '출고준비완료', en: 'Ready' },
 ];
 
 const KNOWN = new Set(VEHICLE_STATUSES.map((s) => s.value));
@@ -23,10 +23,12 @@ export function normalizeStatus(v) {
   const loose = s.replace(/[\s·.,/-]/g, '').toLowerCase();
   if (loose === '선적도착') return '선적·도착';
   if (loose === 'pdi') return 'PDI';
+  // 구 명칭 '출시' → '출고준비완료' (기존 엑셀 값 호환)
+  if (loose === '출시') return '출고준비완료';
   return s;
 }
 
-/** 출시 단계 여부 (신호등 초록) */
+/** 출고준비완료 단계 여부 (신호등 초록) */
 export function isLaunched(v) {
-  return normalizeStatus(v) === '출시';
+  return normalizeStatus(v) === '출고준비완료';
 }

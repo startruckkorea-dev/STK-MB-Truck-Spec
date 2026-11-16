@@ -6,7 +6,7 @@ import Button from '../../components/ui/Button';
 import { useData } from '../../contexts/DataContext';
 import { compareModels } from '../../lib/modelSort';
 import ListFilters, { matchBodySeries } from '../../components/ListFilters';
-import { VEHICLE_STATUSES, normalizeStatus } from '../../lib/vehicleStatus';
+import { VEHICLE_STATUSES, normalizeStatus, isLaunched } from '../../lib/vehicleStatus';
 import { groupForMerge, computeMergeSpans, MODEL_MERGE_LEVELS } from '../../lib/mergeRows';
 
 // 모델 관리 표 병합 단계: MY → 차종분류 → 시리즈 → 모델코드 → 축 → 캐빈
@@ -89,7 +89,7 @@ export default function AdminModels() {
 
   function renderStatusSelect(model) {
     const cur = normalizeStatus(model.vehicle_status);
-    const green = cur === '출시';
+    const green = isLaunched(cur);
     return (
       <select
         value={cur}

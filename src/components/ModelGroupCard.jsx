@@ -25,7 +25,7 @@ export default function ModelGroupCard({
   onDragEnd,
   onNavigate,
 }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, canViewStatus } = useAuth();
   const { setModelVisible } = useData();
   const navigate = useNavigate();
 
@@ -102,7 +102,7 @@ export default function ModelGroupCard({
                       {m.production_month}
                     </span>
                   )}
-                  {m.vehicle_status && <StatusLight status={m.vehicle_status} size="sm" />}
+                  {canViewStatus && m.vehicle_status && <StatusLight status={m.vehicle_status} size="sm" />}
                   {isAdmin && !m.is_visible && (
                     <span className="px-1.5 py-0.5 text-[11px] bg-gray-200 text-gray-500 rounded font-medium">
                       숨김

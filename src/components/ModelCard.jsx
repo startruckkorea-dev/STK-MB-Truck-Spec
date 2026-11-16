@@ -38,7 +38,7 @@ export default function ModelCard({
   onDragEnd,
   onNavigate,
 }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, canViewStatus } = useAuth();
   const { setModelVisible } = useData();
 
   async function toggleVisibility() {
@@ -97,7 +97,7 @@ export default function ModelCard({
 
         {/* 기타 특징 — 항상 동일한 높이 유지 */}
         <div className="min-h-[1rem] mb-3 sm:mb-4 flex items-center gap-2 flex-wrap">
-          {model.vehicle_status && <StatusLight status={model.vehicle_status} size="sm" />}
+          {canViewStatus && model.vehicle_status && <StatusLight status={model.vehicle_status} size="sm" />}
           {model.code_desc && (
             <p className="text-xs text-gray-400 leading-snug">{model.code_desc}</p>
           )}

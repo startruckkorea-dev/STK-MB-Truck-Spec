@@ -70,7 +70,7 @@ function groupByCode(list) {
 export default function Models() {
   const { models, loading, error } = useModels();
   const { reorderModels, modelNotes, setModelVisible } = useData();
-  const { isAdmin } = useAuth();
+  const { isAdmin, canViewStatus } = useAuth();
   const navigate = useNavigate();
 
   // 목록으로 되돌아온 경우 이전에 보던 필터 상태를 복원한다
@@ -304,7 +304,9 @@ export default function Models() {
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">배지</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">기타특징</th>
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap">생산월</th>
-                <th className="px-3 py-2.5 font-medium whitespace-nowrap">출고준비단계</th>
+                {canViewStatus && (
+                  <th className="px-3 py-2.5 font-medium whitespace-nowrap">출고준비단계</th>
+                )}
                 <th className="px-3 py-2.5 font-medium whitespace-nowrap text-center">비교</th>
                 {isAdmin && (
                   <>
@@ -419,11 +421,13 @@ export default function Models() {
                         {model.production_month || <span className="text-gray-300">—</span>}
                       </div>
                     </td>
-                    <td className={`${cell} whitespace-nowrap`}>
-                      <div className={`cell-line ${dim}`}>
-                        <StatusLight status={model.vehicle_status} />
-                      </div>
-                    </td>
+                    {canViewStatus && (
+                      <td className={`${cell} whitespace-nowrap`}>
+                        <div className={`cell-line ${dim}`}>
+                          <StatusLight status={model.vehicle_status} />
+                        </div>
+                      </td>
+                    )}
                     <td className={`${cell} text-center whitespace-nowrap`}>
                       <div className="cell-line items-center">
                       <button

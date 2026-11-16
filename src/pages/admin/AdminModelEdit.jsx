@@ -590,7 +590,7 @@ export default function AdminModelEdit() {
                 </select>
                 <StatusLight status={vehicleStatus} />
               </div>
-              <p className="text-xs text-gray-400 mt-1">모델 목록 신호등: 출시 = 초록, 그 외 단계 = 빨강</p>
+              <p className="text-xs text-gray-400 mt-1">모델 목록 신호등: 출고준비완료 = 초록, 그 외 단계 = 빨강</p>
             </div>
 
             <Toggle

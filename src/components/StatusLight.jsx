@@ -1,7 +1,7 @@
 import { normalizeStatus, isLaunched } from '../lib/vehicleStatus';
 
 /**
- * 출고준비단계 신호등 — 출시 = 초록, 그 외(생산·선적·도착·인증·PDI) = 빨강.
+ * 출고준비단계 신호등 — 출고준비완료 = 초록, 그 외(생산·선적·도착·인증·PDI) = 빨강.
  * 상태가 비어 있으면 회색 대시.
  * size: 'sm'(타일 카드 등) | 'md'(표)
  */
