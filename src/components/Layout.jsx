@@ -21,9 +21,9 @@ const ROLE_BADGE_CLS = {
 const MANUAL_BY_ROLE = {
   admin: '/manuals/manual-admin.html',
   'staff-a': '/manuals/manual-staff-a.html',
-  'staff-b': '/manuals/manual-staff-b-sales.html',
-  staff: '/manuals/manual-staff-b-sales.html',
-  sales: '/manuals/manual-staff-b-sales.html',
+  'staff-b': '/manuals/manual-staff-b.html',
+  staff: '/manuals/manual-staff-b.html',
+  sales: '/manuals/manual-sales.html', // 세일즈 에이전트(Google 로그인)도 role=sales
 };
 
 const navCls = ({ isActive }) =>
@@ -76,7 +76,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const showAdminMenu = isAdmin || canViewDict;
-  const manualUrl = MANUAL_BY_ROLE[profile?.role] || '/manuals/manual-staff-b-sales.html';
+  const manualUrl = MANUAL_BY_ROLE[profile?.role] || '/manuals/manual-sales.html';
 
   async function handleSignOut() {
     await signOut();

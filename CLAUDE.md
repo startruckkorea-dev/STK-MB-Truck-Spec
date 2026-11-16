@@ -45,9 +45,10 @@
 > 본사직원은 A/B 두 단계다. `Access_List` 의 H 컬럼에 `Staff-A`/`Staff-B`(또는 `본사직원A`/`본사직원B`)
 > 로 표기한다. A/B 구분 없는 단독 `Staff`/`본사` 는 기존 호환을 위해 `staff-b` 로 본다.
 
-- **로그인:** Microsoft 365 계정 (MSAL 팝업). 로그인 화면에 버튼이 **두 개**다.
-  - **STK 소속** — 사내 앱 등록(`9b247088-…`), 사내 계정.
-  - **Google 계정으로 로그인** (세일즈 에이전트) — `STK-Sales-Freelancer` 앱 등록
+- **로그인:** Microsoft 365 계정 (MSAL — PC 는 팝업, 모바일 브라우저는 **리디렉션**.
+  모바일 팝업에서 `hash_empty_error` 가 나던 문제 때문). 로그인 화면에 버튼이 **두 개**다.
+  - **Hyosung M365 계정으로 로그인** (STK 소속, 진한 파랑) — 사내 앱 등록(`9b247088-…`), 사내 계정.
+  - **Google 계정으로 로그인** (세일즈 에이전트, 밝은 파랑) — `STK-Sales-Freelancer` 앱 등록
     (`0346d368-7dc6-41a6-a310-7afa10fa5bd7`), 같은 테넌트. gmail / startruck.kr 계정으로
     로그인하며(1인당 2개 가능), 실제 인증은 Entra 게스트 + Google 페더레이션이다.
     ⚠️ **이 경로는 Access 엑셀을 조회하지 않는다.** 이 앱은 Entra 엔터프라이즈 앱에서
@@ -55,7 +56,10 @@
     = 접근 통제는 Entra 할당 목록이 전담하고, 역할은 무조건 `sales` 로 고정된다
     (에이전트에게 SharePoint `Access` 폴더 읽기 권한을 주지 않아도 된다).
     에이전트 추가/제거는 **Entra 엔터프라이즈 앱 > 사용자 및 그룹**에서 한다.
-- **역할(STK 소속 로그인에 한함):** SharePoint `Access` 폴더의 접근권한 엑셀(`Access_List_*.xlsx`)로 관리한다.
+    상단 바 역할 배지는 `세일즈 에이전트` 로 표시된다.
+  - 로그인 오류는 AADSTS 코드별로 한국어 안내를 띄운다 (50105=앱 미할당, 50011=리디렉션 URI 미등록,
+    50020/700016=테넌트에 없는 계정). ([src/pages/Login.jsx](src/pages/Login.jsx))
+- **역할(Hyosung M365 로그인에 한함):** SharePoint `Access` 폴더의 접근권한 엑셀(`Access_List_*.xlsx`)로 관리한다.
   앱 안에는 사용자/역할 편집 화면이 없다 — **엑셀을 직접 편집**해야 한다.
   - `G` 컬럼 = 이메일(키), `H` 컬럼 = 권한(`Admin`/`Staff-A`/`Staff-B`/`Sales`). 1행은 헤더.
   - 그 밖의 컬럼은 **1행 헤더 이름으로 위치를 자동 탐지**한다 (컬럼 순서 자유):
@@ -65,7 +69,9 @@
       (이메일 헤더가 전혀 없으면 그 행에서 `@` 가 든 모든 셀을 같은 사람의 계정으로 본다.)
   - 역할은 앱에서 클릭으로 바꿀 수 없다(전환 UI 없음). 상단 바에 현재 역할 배지만 표시.
 - **부트스트랩:** 목록에 `admin` 이 한 명도 없으면 로그인한 사용자를 모두 `admin` 으로
-  취급(최초 셋업/락아웃 방지). admin 이 한 명이라도 있으면 미등록 사용자는 `sales` 기본.
+  취급(최초 셋업/락아웃 방지, 상단 노란 경고 바). admin 이 한 명이라도 있으면 **미등록 사용자는
+  콘텐츠가 차단**되고 "접근 권한이 없습니다" 화면이 뜬다. Access 파일을 못 읽으면 "권한 정보를
+  불러오지 못했습니다" + [다시 시도]. ([src/components/AccessNotice.jsx](src/components/AccessNotice.jsx))
 - ⚠️ 앱을 쓰려면 SharePoint 워크북 파일과 `Access` 파일의 **"읽기" 권한**이 필요하다
   (관리자는 데이터 워크북 "편집"). 규모 10~50명.
 
@@ -73,21 +79,35 @@
 
 ## 핵심 기능 명세
 
+### 0. 상단 메뉴 ([src/components/Layout.jsx](src/components/Layout.jsx))
+- `모델 목록` · `색상코드` · `제원관리번호` · `관리 ▾`(드롭다운: admin=모델 관리·통계·코드 사전,
+  staff-a=코드 사전만) · `사용자매뉴얼`(역할별 매뉴얼 새 탭) + 언어 토글·역할 배지·로그아웃.
+  모바일은 ☰ 메뉴.
+
 ### 1. 로그인 (`/login`)
-- Microsoft 365 계정으로 로그인 (MSAL 팝업)
-- 로그인 후 역할(`Access` 엑셀)에 따라 네비게이션 메뉴·열람 범위 다르게 표시
+- 버튼 2개(Hyosung M365 / Google) — 위 "사용자 역할" 참고
+- 로그인 후 역할에 따라 네비게이션 메뉴·열람 범위 다르게 표시
 
 ### 2. 모델 목록 페이지 (`/models`)
-- 등록된 모델 카드 그리드 표시 (MY별·차종별 그룹)
-- 필터: 연식(model_year), 시리즈(Actros / Arocs / Atego / eActros)
-- 검색: 모델 코드, 국문명 텍스트 검색
+- 타일/리스트 보기 (PC=리스트, 모바일=타일 기본). 상세에서 돌아오면 필터·스크롤 복원
+- 필터([src/components/ListFilters.jsx](src/components/ListFilters.jsx), 제목 오른쪽 배치 —
+  색상코드·제원관리번호·모델 관리 화면 공용): 차종 탭(전체/트랙터/카고/덤프), 시리즈 드롭다운
+  (Actros / Arocs / Atego / eActros), 연식(MY) 드롭다운, 검색(모델 코드·국문명)
+- 리스트: MY별 표, 차종분류→시리즈→모델코드→축→캐빈 세로 병합. Fleet내수·Fleet수출·Branch주문차
+  배지 모델은 MY마다 "Fleet / 주문차" 별도 표. 타일: 시리즈+모델코드가 같은 모델을 한 카드로 묶음
+  ([src/components/ModelGroupCard.jsx](src/components/ModelGroupCard.jsx))
 - 각 카드에서 [사양 상세 보기] / [비교 추가] 가능
 - 비교 선택 시 하단 고정 바(compare bar) 표시, 최대 3개
 - `sales`/`staff-b` 에게는 `is_visible=false` 모델 숨김 (admin·`staff-a` 는 전체)
+- `sales`(에이전트 포함) 에게는 배지 `Fleet내수`/`Fleet수출` 모델도 숨김
+  ([src/lib/modelSort.js](src/lib/modelSort.js) `SALES_HIDDEN_BADGES`)
+- 출고준비단계 신호등 열(admin·staff-a/b). admin 은 공개 토글·드래그 순서 변경 가능
 
 ### 2-1. 공지사항 게시판 (모델 목록 상단)
 - 첫 화면(`/models`) 최상단에 공지 목록이 표시된다 (고정글 우선 → 최신순, **한 페이지 5건**,
-  그 이상은 하단 페이지 번호(‹ 이전 / 1 2 3 / 다음 ›)로 넘겨 본다)
+  그 이상은 하단 페이지 번호(‹ 이전 / 1 2 3 / 다음 ›)로 넘겨 본다). 7일 이내 글은 `NEW` 배지
+- 진입 **5초 후 고정글만 남기고 자동 접힘** (마우스 hover 중이면 보류, 세션당 1회 —
+  같은 탭에서 돌아오면 접힌 채 시작). [펼치기 ▾ (+n)] / [접기 ▴] 로 수동 전환
 - 제목을 클릭하면 모달로 본문과 첨부파일을 본다. 이미지는 바로 표시(클릭 시 확대),
   PDF·문서는 [열기]/[다운로드] 링크
 - **관리자만** 작성/수정/삭제, [고정](상단 고정)·[숨김](비공개) 전환 가능.
@@ -102,10 +122,28 @@
 - 카테고리별 사양 테이블
 - 각 행: 항목명(국문) / 영문 코드 / 번역된 값
 - 외장 컬러 코드 → 컬러 스와치 + 국문명 표시
+- 헤더: 모델명·생산월·기타특징 + **대표 외장색 스와치** + **제원관리번호**(제원표 연결 시)
+- 우측 버튼: 📷 사진 · 제원표 · 외관사면도 · PDF · Excel(admin·staff-a) · 코드숨김 출력(admin·staff-a/b)
+
+### 3-1. 색상코드 (`/colors`)
+- MY별 모델 외장 컬러 코드 표 (차종분류·시리즈·모델코드·축·캐빈·기타특징·색상코드·색상명, 세로 병합).
+  모바일은 카드형 목록. ([src/pages/ColorCodes.jsx](src/pages/ColorCodes.jsx))
+
+### 3-2. 제원관리번호 (`/homolog`) — 전체 역할
+- 모델에 연결된 제원표(`homolog_spec_url`) **파일명**에서 제원관리번호를 추출해 MY → 차종별 표로 보여 준다
+  (`0365-00133-0020-3025__….pdf` → `036-5-00133-0020-3025`, [src/lib/homologNo.js](src/lib/homologNo.js)).
+  별도 입력 컬럼 없음. 번호 [복사] 버튼, 제원표·도면(`homolog_view_url`) 아이콘 링크.
+  링크 없음 → `제원표 미연동`, 파일명에서 못 찾음 → `번호 인식 불가`. 모바일은 카드형 목록.
+  ([src/pages/HomologNumbers.jsx](src/pages/HomologNumbers.jsx), [src/components/DocIconLink.jsx](src/components/DocIconLink.jsx))
 
 ### 4. 모델 비교 페이지 (`/compare?ids=1,2,3`)
 - 선택한 2~3개 모델 좌우 나란히 비교 테이블
-- 값이 다른 항목 하이라이트, 동일 항목은 흐리게
+- 값이 다른 항목 하이라이트, 동일 항목은 흐리게. [전체 보기]/[차이점만 보기]
+- 모바일: 2개는 화면 폭에 맞춰 스크롤 없이, 3개는 가로 스크롤
+
+### 4-1. 관리자 — 모델 관리 목록 (`/admin/models`)
+- 필터(차종 탭·시리즈·MY·공개 상태), 열 정렬(차종·시리즈·상태) / [기본 정렬(묶어보기)] 시 세로 병합
+- 행에서 출고준비단계 드롭다운 즉시 저장, 공개/숨김 토글, 편집·보기·삭제
 
 ### 5. 관리자 — 모델 등록/편집 (`/admin/models/new`, `/admin/models/:id/edit`)
 - 사양서(.docx) 가져오기 — 두 가지 경로:
@@ -123,14 +161,18 @@
   - ⚠️ 이 편집은 `code_dict`/`specs` 시트에만 반영된다. SharePoint 공유폴더의
     **견적서(.docx) 원본 파일은 변경하지 않는다.** 같은 모델에서 .docx 를 다시
     파싱해도 KR 코드로 추가한 행은 유지된다.
-- 확인 후 저장 → `models` / `specs` / `model_notes` 시트에 기록
+- 필수: 시리즈·모델 코드·차종분류(드롭다운: 트랙터/카고/덤프/기타)·Model Year.
+  같은 모델코드+축+캐빈+MY 조합은 기타특징(`code_desc`)이 없으면 등록 차단
+- 출고준비단계 선택, 인증 자료 링크(제원표·외관사면도, SharePoint `Homologation` 에서 선택)
+- 확인 후 저장 → `models` / `specs` / `model_notes` 시트에 기록 (편집 시 변경분만
+  워크북 세션 안에서 기록)
 
 ### 6. 관리자 — 코드 번역 사전 (`/admin/dict`)
 - `code_dict` 시트 CRUD (영문 코드 ↔ 국문명, 분류, HEX 컬러, 숨김)
 - 상단 패널에서 SharePoint Excel 파일 바로 열기 + [다시 불러오기]
 
 ### 6-1. 관리자 — 사용 통계 (`/admin/stats`)
-- 상단 메뉴 `통계` (admin 전용). 일자별 접속자 수, 사용자별 접속 현황, 다운로드(Excel/PDF) 내역.
+- 상단 `관리 ▾` > `통계` (admin 전용). 일자별 접속자 수, 사용자별 접속 현황, 다운로드(Excel/PDF) 내역.
 - 기간 7/30/90일 선택. 접속은 탭(세션)·일자당 1회, 다운로드는 상세/비교 페이지 버튼 클릭 시 기록.
 - 기록은 SharePoint `mbtruck-spec/Log/` 폴더에 **사용자별 JSON**(`{이메일}.json`)으로 저장
   (최근 120일·최대 3000건 보관). 각자 자기 파일에만 쓰므로 충돌이 없다.
@@ -232,6 +274,9 @@ mb-truck-spec/
 │   ├── export-to-xlsx.mjs     ← (1회성·과거) Supabase → xlsx 추출 스크립트
 │   └── debug-docx.mjs         ← .docx 파싱 디버그용
 ├── public/
+│   └── manuals/               ← 역할별 사용자 매뉴얼(HTML, 이미지 base64 내장) — 배포됨
+│       ├── manual-admin.html, manual-staff-a.html, manual-staff-b.html, manual-sales.html
+├── docs/                      ← 매뉴얼 원본 사본(HTML)·스크린샷(images/)·PDF(pdf/)
 ├── src/
 │   ├── main.jsx               ← Auth → Data → SpecLang Provider 순 래핑
 │   ├── App.jsx                ← 라우팅, RequireAuth / RequireAdmin 가드
@@ -242,6 +287,11 @@ mb-truck-spec/
 │   │   ├── sourceFiles.js     ← SharePoint 견적서(.docx) 폴더 탐색
 │   │   ├── accessList.js      ← SharePoint Access 폴더 접근권한 엑셀 읽기
 │   │   ├── notices.js         ← 공지 첨부파일(SharePoint Notice 폴더)
+│   │   ├── activityLog.js     ← 접속·다운로드 기록(SharePoint Log 폴더)
+│   │   ├── pictures.js, specImages.js ← 모델 사진 / 사양 코드별 이미지
+│   │   ├── homologation.js, homologNo.js ← 인증 자료 폴더 / 제원관리번호 추출
+│   │   ├── mergeRows.js, modelSort.js    ← 표 세로 병합 / 모델 정렬·영업 숨김 배지
+│   │   ├── vehicleStatus.js, specCategories.js ← 출고준비단계 / 사양 카테고리 목록
 │   │   ├── codeIndex.js       ← 코드 사전 매칭 유틸
 │   │   ├── parser.js          ← .docx 파싱 (mammoth) + 파일명 기본정보 추출
 │   │   └── export.js          ← 사양 Excel/PDF 내보내기
@@ -253,11 +303,12 @@ mb-truck-spec/
 │   │   ├── admin/SharePointPicker.jsx ← 견적서 .docx 공유폴더 탐색 모달
 │   │   ├── NoticeBoard.jsx           ← 모델 목록 상단 공지사항 게시판
 │   │   ├── admin/NoticeEditor.jsx    ← 공지 작성/수정 모달(첨부 업로드)
-│   │   ├── Layout.jsx, ModelCard.jsx, SpecTable.jsx,
-│   │   ├── CompareTable.jsx, CompareBar.jsx, ColorSwatch.jsx
+│   │   ├── Layout.jsx, ModelCard.jsx, ModelGroupCard.jsx, SpecTable.jsx,
+│   │   ├── CompareTable.jsx, CompareBar.jsx, ColorSwatch.jsx, ListFilters.jsx,
+│   │   ├── StatusLight.jsx, DocIconLink.jsx, PhotoGallery.jsx, ImageLightbox.jsx, AccessNotice.jsx
 │   ├── pages/
-│   │   ├── Login.jsx, Models.jsx, ModelDetail.jsx, Compare.jsx
-│   │   └── admin/AdminModels.jsx, AdminModelEdit.jsx, AdminDict.jsx
+│   │   ├── Login.jsx, Models.jsx, ModelDetail.jsx, Compare.jsx, ColorCodes.jsx, HomologNumbers.jsx
+│   │   └── admin/AdminModels.jsx, AdminModelEdit.jsx, AdminDict.jsx, AdminStats.jsx
 │   ├── hooks/
 │   │   ├── useAuth.jsx, useModels.js, useDict.js, useSpecLang.jsx
 │   └── styles/index.css
@@ -265,6 +316,21 @@ mb-truck-spec/
 ├── vite.config.js
 └── package.json
 ```
+
+---
+
+## 사용자 매뉴얼 유지 관리
+
+- 상단 `사용자매뉴얼` 메뉴가 역할별 파일을 연다: admin → `manual-admin.html`,
+  staff-a → `manual-staff-a.html`, staff-b → `manual-staff-b.html`,
+  sales(세일즈 에이전트 포함, Google 로그인 안내 수록) → `manual-sales.html`
+  (`/manuals/…`, 매핑은 [src/components/Layout.jsx](src/components/Layout.jsx) `MANUAL_BY_ROLE`).
+- 사용자에게 보이는 기능을 바꾸면 **네 매뉴얼의 해당 장도 같이 고친다** (권한 표·메뉴·화면 설명·FAQ).
+  `public/manuals/` 를 수정한 뒤 `docs/` 에 같은 파일을 복사하고, 필요하면 `docs/pdf/` 를 다시 인쇄한다.
+- 스크린샷은 base64 로 HTML 에 내장돼 있어 파일이 크다(각 ~3MB). 편집할 때는 data URI 를
+  자리표시자로 바꿨다가 되돌리는 방식이 안전하다.
+- 최종 매뉴얼 갱신: **2026-11-16** (공지·제원관리번호·통계·출고준비단계·에이전트 로그인·관리 메뉴 반영).
+  모델 목록·상단 바·색상코드·SharePoint 폴더 스크린샷은 이전 화면이라 캡션에 그렇게 표시해 두었다.
 
 ---
 
@@ -301,6 +367,7 @@ VITE_SP_FOLDER_PATH=mbtruck-spec/Code          # 데이터 워크북(.xlsx) 폴�
 VITE_SP_QUOTATION_PATH=mbtruck-spec/Quotation  # 견적서(.docx) 원본 폴더
 VITE_SP_PICTURES_PATH=mbtruck-spec/Pictures    # 모델 사진 원본 폴더
 VITE_SP_SPEC_PICTURES_PATH=mbtruck-spec/spec_picture  # 사양 코드별 이미지 폴더(파일명=코드명)
+VITE_SP_HOMOLOGATION_PATH=mbtruck-spec/Homologation   # 인증 자료(제원표·외관사면도) 폴더
 VITE_SP_ACCESS_PATH=mbtruck-spec/Access        # 접근권한 엑셀(Access_List_*.xlsx) 폴더
 VITE_SP_NOTICE_PATH=mbtruck-spec/Notice        # 공지사항 첨부파일 폴더(앱이 없으면 자동 생성)
 VITE_SP_LOG_PATH=mbtruck-spec/Log              # 접속·다운로드 기록 폴더(앱이 없으면 자동 생성)
@@ -339,6 +406,10 @@ VITE_APP_TITLE=...
     (사진 없을 때 갤러리에 권장 폴더명이 표시되니 그대로 만들면 된다.)
   - 상세 화면 [📷 사진] 버튼이 이 폴더를 조회해 갤러리로 보여준다 (sales 포함 전체 열람).
     별도 연결/등록 작업 없이 폴더에 이미지를 넣기만 하면 된다. ([src/lib/pictures.js])
+- 인증 자료 폴더: `Shared Documents/mbtruck-spec/Homologation/`
+  - 인증팀 배포 제원표·외관사면도. 모델 편집의 [인증 자료 링크]에서 선택해 `homolog_spec_url`/
+    `homolog_view_url` 에 저장. **제원표 파일명이 제원관리번호로 시작**해야 `/homolog` 페이지·상세 헤더에
+    번호가 표시된다 (`0365-00133-0020-3025__2851L_6X4 S5F-STK.pdf`). ([src/lib/homologation.js])
 - 사양 코드별 이미지 폴더: `Shared Documents/mbtruck-spec/spec_picture/` (평면 폴더)
   - **파일명 = 코드명** 규칙으로 자동 매칭 (`A0A.jpg`, `w68k96 80.png` … 대소문자·확장자 무관).
   - 사양 상세 각 행에서, 해당 코드의 이미지가 폴더에 있으면 값 오른쪽에 [🖼 보기] 버튼이
