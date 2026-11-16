@@ -492,18 +492,19 @@ export default function Models() {
       <NoticeBoard />
 
       {/* 헤더 — 제목 오른쪽에 필터, 맨 오른쪽에 타일/리스트 토글 */}
-      <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="flex-shrink-0">
-          <h1 className="font-barlow font-bold text-xl sm:text-2xl text-gray-900 tracking-wide">
+      {/* 모바일: 1줄 = 제목·개수 + 타일/리스트 토글, 2줄 = 필터 (최소 높이) */}
+      <div className="mb-3 sm:mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 sm:gap-y-3">
+        <div className="flex-shrink-0 flex items-baseline gap-2 sm:block">
+          <h1 className="font-barlow font-bold text-lg sm:text-2xl text-gray-900 tracking-wide">
             모델 목록
           </h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
+          <p className="text-gray-500 text-xs sm:text-sm sm:mt-0.5">
             {filtered.length}개 모델
           </p>
         </div>
 
         <ListFilters
-          className="flex-1 min-w-0"
+          className="order-last sm:order-none w-full sm:w-auto sm:flex-1 min-w-0"
           bodyType={bodyType}
           setBodyType={setBodyType}
           series={activeSeries}
@@ -517,7 +518,7 @@ export default function Models() {
         />
 
         {/* 타일 / 리스트 뷰 토글 */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0 ml-auto">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 sm:p-1 flex-shrink-0 ml-auto">
           {[
             { key: 'tile', label: '타일' },
             { key: 'list', label: '리스트' },
@@ -525,7 +526,7 @@ export default function Models() {
             <button
               key={v.key}
               onClick={() => changeView(v.key)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
                 viewMode === v.key
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'

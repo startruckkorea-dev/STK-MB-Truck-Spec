@@ -11,13 +11,13 @@ export default function ColorSwatch({ hexColor, nameKo, label, size = 'md' }) {
   const text = label ?? nameKo;
 
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex items-center gap-1.5 sm:gap-2 min-w-0">
       <span
         className={`inline-block rounded-full border border-gray-200 shadow-sm flex-shrink-0 ${sizes[size] ?? sizes.md}`}
         style={{ backgroundColor: hexColor ?? '#cccccc' }}
         title={hexColor}
       />
-      <span className="text-gray-800">{text}</span>
+      <span className="text-gray-800 break-words min-w-0">{text}</span>
     </span>
   );
 }

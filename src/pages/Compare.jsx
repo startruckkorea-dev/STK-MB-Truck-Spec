@@ -62,7 +62,7 @@ export default function Compare() {
   return (
     <Layout>
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
+      <div className="flex items-start sm:items-center justify-between gap-2 mb-3 sm:mb-6">
         <div>
           <h1 className="font-barlow font-bold text-lg sm:text-2xl text-gray-900 tracking-wide">
             모델 비교
@@ -94,7 +94,7 @@ export default function Compare() {
             </button>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
+        <div className="flex gap-1.5 sm:gap-2 flex-wrap items-center justify-end">
           {canViewCodes && (
             <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none mr-1">
               <input

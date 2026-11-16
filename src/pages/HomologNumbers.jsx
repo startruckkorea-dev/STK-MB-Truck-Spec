@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Badge from '../components/ui/Badge';
+import DocIconLink from '../components/DocIconLink';
 import ListFilters, { matchBodySeries } from '../components/ListFilters';
 import { useData } from '../contexts/DataContext';
 import { useModels } from '../hooks/useModels';
@@ -106,9 +107,9 @@ export default function HomologNumbers() {
   return (
     <Layout>
       {/* 헤더 — 제목 오른쪽에 필터 */}
-      <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div className="mb-3 sm:mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 sm:gap-y-3">
         <div className="flex-shrink-0">
-          <h1 className="font-barlow font-bold text-xl sm:text-2xl text-gray-900 tracking-wide">
+          <h1 className="font-barlow font-bold text-lg sm:text-2xl text-gray-900 tracking-wide">
             제원관리번호
           </h1>
           <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
@@ -117,7 +118,7 @@ export default function HomologNumbers() {
         </div>
 
         <ListFilters
-          className="flex-1 min-w-0"
+          className="w-full sm:w-auto sm:flex-1 min-w-0"
           bodyType={bodyType}
           setBodyType={setBodyType}
           series={series}
@@ -158,7 +159,11 @@ export default function HomologNumbers() {
               <div className="flex-1 h-px bg-gray-200" />
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+            {/* 모바일: 좌우 스크롤 없는 카드형 목록 */}
+            <MobileHomologList types={types} notesByModel={notesByModel} onOpen={(id) => navigate(`/models/${id}`)} />
+
+            {/* 데스크톱: 병합 표 */}
+            <div className="hidden sm:block bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50 text-left text-gray-500">
@@ -199,7 +204,6 @@ export default function HomologNumbers() {
                           </td>
                         );
                       };
-                      const stop = (e) => e.stopPropagation();
                       return (
                         <tr
                           key={model.id}
@@ -253,40 +257,11 @@ export default function HomologNumbers() {
                             )}
                             </div>
                           </td>
-                          <td className={`${cell} text-xs whitespace-nowrap`}>
-                            <div className="cell-line">
-                            {model.homolog_spec_url ? (
-                              <a
-                                href={model.homolog_spec_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={stop}
-                                className="text-mb-blue hover:underline"
-                                title={file}
-                              >
-                                📄 열기
-                              </a>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                            </div>
+                          <td className={`${cell} whitespace-nowrap`}>
+                            <DocIconLink kind="spec" url={model.homolog_spec_url} title={file} size="sm" />
                           </td>
-                          <td className={`${cell} text-xs whitespace-nowrap`}>
-                            <div className="cell-line">
-                            {model.homolog_view_url ? (
-                              <a
-                                href={model.homolog_view_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={stop}
-                                className="text-mb-blue hover:underline"
-                              >
-                                📐 열기
-                              </a>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                            </div>
+                          <td className={`${cell} whitespace-nowrap`}>
+                            <DocIconLink kind="drawing" url={model.homolog_view_url} size="sm" />
                           </td>
                         </tr>
                       );
@@ -299,5 +274,50 @@ export default function HomologNumbers() {
         ))
       )}
     </Layout>
+  );
+}
+
+/** 모바일 전용 목록 — 차종별 소제목 아래 모델 한 줄씩: 모델명·특징 / 번호 / 제원표·도면 아이콘 */
+function MobileHomologList({ types, notesByModel, onOpen }) {
+  return (
+    <div className="sm:hidden space-y-3">
+      {types.map(([body, items]) => (
+        <div key={body}>
+          <div className="text-xs font-semibold text-gray-400 tracking-widest mb-1 px-1">{body}</div>
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm divide-y divide-gray-100">
+            {groupForMerge(items, (it) => it.model).map(({ model, no, file }) => {
+              const notes = notesByModel[model.id] ?? [];
+              const desc = notes.length ? notes.map((n) => n.label).join(' · ') : model.code_desc;
+              return (
+                <div
+                  key={model.id}
+                  onClick={() => onOpen(model.id)}
+                  className="flex items-center gap-2 px-3 py-2 active:bg-gray-50 cursor-pointer"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-gray-900 truncate">{modelName(model)}</div>
+                    {desc && <div className="text-[11px] text-gray-500 truncate">{desc}</div>}
+                    <div className="text-xs font-mono mt-0.5 flex items-center min-w-0">
+                      {no ? (
+                        <>
+                          <span className="text-gray-800 truncate">{no}</span>
+                          <CopyButton text={no} />
+                        </>
+                      ) : (
+                        <span className="text-gray-300">
+                          {model.homolog_spec_url ? '번호 인식 불가' : '제원표 미연동'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <DocIconLink kind="spec" url={model.homolog_spec_url} title={file} />
+                  <DocIconLink kind="drawing" url={model.homolog_view_url} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

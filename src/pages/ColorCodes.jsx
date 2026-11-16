@@ -113,9 +113,9 @@ export default function ColorCodes() {
   return (
     <Layout>
       {/* 헤더 — 제목 오른쪽에 필터 */}
-      <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div className="mb-3 sm:mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 sm:gap-y-3">
         <div className="flex-shrink-0">
-          <h1 className="font-barlow font-bold text-xl sm:text-2xl text-gray-900 tracking-wide">
+          <h1 className="font-barlow font-bold text-lg sm:text-2xl text-gray-900 tracking-wide">
             색상코드
           </h1>
           <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
@@ -124,7 +124,7 @@ export default function ColorCodes() {
         </div>
 
         <ListFilters
-          className="flex-1 min-w-0"
+          className="w-full sm:w-auto sm:flex-1 min-w-0"
           bodyType={bodyType}
           setBodyType={setBodyType}
           series={activeSeries}
@@ -167,7 +167,43 @@ export default function ColorCodes() {
                 <div className="flex-1 h-px bg-gray-200" />
               </div>
 
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+              {/* 모바일: 좌우 스크롤 없는 카드형 목록 */}
+              <div className="sm:hidden bg-white border border-gray-200 rounded-xl shadow-sm divide-y divide-gray-100">
+                {groupForMerge(items, (it) => it.model).map(({ model, rows }) => (
+                  <div
+                    key={model.id}
+                    onClick={() => navigate(`/models/${model.id}`)}
+                    className="px-3 py-2 active:bg-gray-50 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {model.name_ko && (
+                        <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 rounded px-1 py-0.5 flex-shrink-0">
+                          {model.name_ko}
+                        </span>
+                      )}
+                      <span className="font-semibold text-sm text-gray-900 truncate">{modelName(model)}</span>
+                    </div>
+                    {model.code_desc && (
+                      <div className="text-[11px] text-gray-500 truncate">{model.code_desc}</div>
+                    )}
+                    <ul className="mt-1 space-y-0.5">
+                      {rows.map((row, ri) => (
+                        <li key={`${row.code}-${ri}`} className="flex items-center justify-between gap-2 text-xs">
+                          {row.hasEntry ? (
+                            <ColorSwatch hexColor={row.hex} nameKo={row.name || row.code} size="sm" />
+                          ) : (
+                            <span className="text-amber-500">번역 미등록</span>
+                          )}
+                          <span className="font-mono text-gray-500 whitespace-nowrap flex-shrink-0">{row.code}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              {/* 데스크톱: 병합 표 */}
+              <div className="hidden sm:block bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
                 <table className="w-full text-sm table-fixed min-w-[820px] border-collapse">
                   {/* MY별 표 열 너비 통일 */}
                   <colgroup>
