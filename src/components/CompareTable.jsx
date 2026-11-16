@@ -44,13 +44,18 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
   return (
     // 모바일: '항목' 열을 숨기고 모델 열을 균등 분할(table-fixed) → 좌우 스크롤 없이 한눈에.
     //         항목명은 값 행 위에 작은 회색 줄로 표시한다.
-    <div className="sm:overflow-x-auto -mx-px">
-      <table className="w-full table-fixed text-xs sm:text-base border-collapse sm:min-w-[480px]">
+    // 2개까지는 화면 폭에 맞춰 스크롤 없이, 3개 이상은 열 폭을 유지하고 좌우 스크롤.
+    <div className="overflow-x-auto -mx-px">
+      <table
+        className={`w-full table-fixed text-xs sm:text-base border-collapse ${
+          models.length >= 3 ? 'min-w-[520px]' : 'sm:min-w-[480px]'
+        }`}
+      >
         <thead>
           <tr className="border-b-2 border-gray-200">
             <th className="hidden sm:table-cell text-left px-4 py-3 text-gray-500 font-medium w-36 bg-gray-50 sticky left-0 z-10">항목</th>
             {models.map((m) => (
-              <th key={m.id} className="px-1.5 sm:px-4 py-2 sm:py-3 bg-gray-50 text-left align-top">
+              <th key={m.id} className="px-2.5 sm:px-4 py-2 sm:py-3 bg-gray-50 text-left align-top">
                 <div className="flex flex-col gap-0.5 sm:gap-1">
                   <div className="flex items-center gap-0.5 sm:gap-1 flex-wrap">
                     {m.name_ko && <Badge variant="default" className={MOBILE_BADGE}>{m.name_ko}</Badge>}
@@ -79,14 +84,7 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
           {/* 보충 설명 노트 섹션 */}
           {hasAnyNotes && (
             <>
-              <tr className="bg-gray-50">
-                <td
-                  colSpan={models.length + 1}
-                  className="px-1.5 sm:px-4 py-1 sm:py-2 font-barlow font-semibold text-gray-700 tracking-wide uppercase text-sm"
-                >
-                  보충 설명
-                </td>
-              </tr>
+              <SectionRow span={models.length}>보충 설명</SectionRow>
               <tr className="border-b border-gray-200">
                 <td className="hidden sm:table-cell px-4 py-3 text-gray-400 text-xs align-top sticky left-0 bg-white z-10">
                   —
@@ -94,7 +92,7 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
                 {models.map((m) => {
                   const notes = notesMap[m.id] ?? [];
                   return (
-                    <td key={m.id} className="px-1.5 sm:px-4 py-2 sm:py-3 align-top break-words">
+                    <td key={m.id} className="px-2.5 sm:px-4 py-2 sm:py-3 align-top break-words">
                       {notes.length === 0 ? (
                         <span className="text-gray-300 text-xs">—</span>
                       ) : (
@@ -117,14 +115,9 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
           {renderRows.map((row) => {
             if (row.type === 'category') {
               return (
-                <tr key={`cat-${row.category}`} className="bg-gray-50">
-                  <td
-                    colSpan={models.length + 1}
-                    className="px-1.5 sm:px-4 py-1 sm:py-2 font-barlow font-semibold text-gray-700 tracking-wide uppercase text-sm"
-                  >
-                    {row.category}
-                  </td>
-                </tr>
+                <SectionRow key={`cat-${row.category}`} span={models.length}>
+                  {row.category}
+                </SectionRow>
               );
             }
 
@@ -162,7 +155,7 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
               {/* 모바일 전용: 항목명 줄 */}
               {label && (
                 <tr className={`sm:hidden ${isDifferent ? '' : 'opacity-65'}`} style={rowStyle}>
-                  <td colSpan={models.length} className="px-1.5 pt-1.5 pb-0 text-[11px] text-gray-400 break-words">
+                  <td colSpan={models.length} className="px-2.5 pt-1.5 pb-0 text-[11px] text-gray-400 break-words">
                     {label}
                   </td>
                 </tr>
@@ -177,7 +170,7 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
                   {label}
                 </td>
                 {values.map((spec, i) => (
-                  <td key={models[i].id} className="px-1.5 sm:px-4 py-1.5 sm:py-2.5 align-top break-words">
+                  <td key={models[i].id} className="px-2.5 sm:px-4 py-1.5 sm:py-2.5 align-top break-words">
                     {spec ? (
                       <SpecValue spec={spec} dict={dict} language={language} />
                     ) : (
@@ -192,6 +185,20 @@ export default function CompareTable({ models, specsMap, notesMap = {}, dict, sh
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * 카테고리/섹션 헤더 행. 모바일은 '항목' 열이 숨겨지므로 colSpan 을 모델 수만큼,
+ * 데스크톱은 +1. (하나의 colSpan 으로 처리하면 모바일에 빈 열이 생긴다)
+ */
+function SectionRow({ span, children }) {
+  const cls = 'px-2.5 sm:px-4 py-1 sm:py-2 font-barlow font-semibold text-gray-700 tracking-wide uppercase text-sm';
+  return (
+    <tr className="bg-gray-50">
+      <td colSpan={span} className={`sm:hidden ${cls}`}>{children}</td>
+      <td colSpan={span + 1} className={`hidden sm:table-cell ${cls}`}>{children}</td>
+    </tr>
   );
 }
 

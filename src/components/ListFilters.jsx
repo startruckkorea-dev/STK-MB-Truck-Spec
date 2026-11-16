@@ -12,7 +12,7 @@ export function matchBodySeries(model, bodyType, series) {
 
 // 모바일: 시리즈·연식·검색이 한 줄에 나란히(flex-1), 높이 축소 / 데스크톱: 기존 크기
 const selectCls =
-  'h-8 sm:h-9 flex-1 min-w-0 sm:flex-none sm:w-auto px-1.5 sm:px-3 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-mb-blue';
+  'h-8 sm:h-9 flex-none w-auto px-2 sm:px-3 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-mb-blue';
 
 /**
  * 목록 화면 공통 필터 바 — 페이지 제목 오른쪽에 놓는다.
@@ -78,7 +78,7 @@ export default function ListFilters({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={searchPlaceholder}
-          className="h-8 sm:h-9 flex-[1.4] min-w-0 sm:flex-none sm:w-56 px-2 sm:px-3 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
+          className="h-8 sm:h-9 flex-1 min-w-[6rem] sm:flex-none sm:w-56 px-2 sm:px-3 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-mb-blue"
         />
       )}
     </div>

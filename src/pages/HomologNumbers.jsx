@@ -55,7 +55,6 @@ export default function HomologNumbers() {
   const [series, setSeries] = useState(''); // '' = 전체 시리즈
   const [selectedYear, setSelectedYear] = useState('');
   const [search, setSearch] = useState('');
-  const [onlyMissing, setOnlyMissing] = useState(false);
 
   // model_id → 기타특징(노트) 배열
   const notesByModel = useMemo(() => {
@@ -70,11 +69,6 @@ export default function HomologNumbers() {
     [models]
   );
 
-  const missingCount = useMemo(
-    () => models.filter((m) => !parseHomologNo(m.homolog_spec_url)).length,
-    [models]
-  );
-
   // 필터 → MY별 → 차종별 그룹 (모델 순서는 useModels 정렬 유지)
   const grouped = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -83,7 +77,6 @@ export default function HomologNumbers() {
       if (!matchBodySeries(model, bodyType, series)) continue;
       if (selectedYear && model.model_year !== selectedYear) continue;
       const no = parseHomologNo(model.homolog_spec_url);
-      if (onlyMissing && no) continue;
       const file = homologFileName(model.homolog_spec_url);
       if (
         q &&
@@ -102,7 +95,7 @@ export default function HomologNumbers() {
     return Object.entries(yearMap)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([year, typeMap]) => ({ year, types: sortBodyTypes(Object.entries(typeMap)) }));
-  }, [models, bodyType, series, selectedYear, search, onlyMissing]);
+  }, [models, bodyType, series, selectedYear, search]);
 
   return (
     <Layout>
@@ -129,17 +122,7 @@ export default function HomologNumbers() {
           search={search}
           setSearch={setSearch}
           searchPlaceholder="모델·번호 검색..."
-        >
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none whitespace-nowrap">
-            <input
-              type="checkbox"
-              checked={onlyMissing}
-              onChange={(e) => setOnlyMissing(e.target.checked)}
-              className="accent-mb-blue"
-            />
-            번호 없는 모델만 ({missingCount})
-          </label>
-        </ListFilters>
+        />
       </div>
 
       {loading ? (
